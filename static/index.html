@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ViT Image Classifier</title>
+    <style>
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; margin-top: 50px; }
+        #result { margin-top: 20px; font-weight: bold; font-size: 1.2em; }
+    </style>
+</head>
+<body>
+    <h1>Vision Transformer Image Classifier</h1>
+    <form id="upload-form">
+        <input type="file" id="file-input" name="file" accept="image/*">
+        <button type="submit">Classify Image</button>
+    </form>
+    <div id="result"></div>
+
+    <script>
+        const form = document.getElementById('upload-form');
+        const resultDiv = document.getElementById('result');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData();
+            formData.append('file', document.getElementById('file-input').files[0]);
+
+            resultDiv.textContent = 'Classifying...';
+
+            try {
+                const response = await fetch('/classify', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    resultDiv.textContent = `Predicted: ${data.prediction}`;
+                } else {
+                    resultDiv.textContent = `Error: ${data.detail}`;
+                }
+            } catch (error) {
+                resultDiv.textContent = 'An error occurred.';
+                console.error(error);
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+# Core dependencies
+gradio>=4.0.0
+torch>=2.0.0
+transformers>=4.30.0
+Pillow>=9.0.0
+
+# Object detection models
+ultralytics>=8.0.0  # YOLOv8
+timm>=0.9.0  # Vision Transformer support
+
+# For future phases
+fastapi>=0.100.0
+uvicorn[standard]>=0.22.0
+python-multipart>=0.0.5
