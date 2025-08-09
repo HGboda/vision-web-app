@@ -19,3 +19,7 @@ __pycache__/
 *.pth
 *.onnx
 *.bin
+
+# Node.js
+node_modules/
+frontend/node_modules/
