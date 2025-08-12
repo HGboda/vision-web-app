@@ -18,3 +18,9 @@ numpy>=1.20.0
 fastapi>=0.100.0
 uvicorn[standard]>=0.22.0
 python-multipart>=0.0.5
+
+# Llama 4 integration
+accelerator>=0.20.0
+bitsandbytes>=0.41.0
+sentencepiece>=0.1.99
+protobuf>=4.23.0

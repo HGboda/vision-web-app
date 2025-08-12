@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 import time
 from flask_cors import CORS
+import json
 
 app = Flask(__name__, static_folder='static')
 CORS(app)  # Enable CORS for all routes
@@ -57,6 +58,75 @@ except Exception as e:
 # Get device information
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
+
+# LLM model (using an open-access model instead of Llama 4 which requires authentication)
+llm_model = None
+llm_tokenizer = None
+try:
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+    
+    print("Loading LLM model... This may take a moment.")
+    model_name = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"  # Using TinyLlama as an open-access alternative
+    
+    llm_tokenizer = AutoTokenizer.from_pretrained(model_name)
+    llm_model = AutoModelForCausalLM.from_pretrained(
+        model_name,
+        torch_dtype=torch.float16,
+        # Removing options that require accelerate package
+        # device_map="auto",
+        # load_in_8bit=True
+    ).to(device)
+    print("LLM model loaded successfully")
+except Exception as e:
+    print(f"Error loading LLM model: {e}")
+    llm_model = None
+    llm_tokenizer = None
+
+def process_llm_query(vision_results, user_query):
+    """Process a query with the LLM model using vision results and user text"""
+    if llm_model is None or llm_tokenizer is None:
+        return {"error": "LLM model not available"}
+    
+    # Create a prompt combining vision results and user query
+    prompt = f"""You are an AI assistant analyzing image detection results. 
+    Here are the objects detected in the image: {json.dumps(vision_results, indent=2)}
+    
+    User question: {user_query}
+    
+    Please provide a detailed analysis based on the detected objects and the user's question.
+    """
+    
+    # Tokenize and generate response
+    try:
+        start_time = time.time()
+        
+        inputs = llm_tokenizer(prompt, return_tensors="pt").to(device)
+        with torch.no_grad():
+            output = llm_model.generate(
+                **inputs,
+                max_new_tokens=512,
+                temperature=0.7,
+                top_p=0.9,
+                do_sample=True
+            )
+        
+        response_text = llm_tokenizer.decode(output[0], skip_special_tokens=True)
+        
+        # Remove the prompt from the response
+        if response_text.startswith(prompt):
+            response_text = response_text[len(prompt):].strip()
+        
+        inference_time = time.time() - start_time
+        
+        return {
+            "response": response_text,
+            "performance": {
+                "inference_time": round(inference_time, 3),
+                "device": "GPU" if torch.cuda.is_available() else "CPU"
+            }
+        }
+    except Exception as e:
+        return {"error": f"Error processing LLM query: {str(e)}"}
 
 def image_to_base64(img):
     """Convert PIL Image to base64 string"""
@@ -266,6 +336,25 @@ def vit_classify():
     image = Image.open(file.stream)
     
     result = process_vit(image)
+    return jsonify(result)
+
+@app.route('/api/analyze', methods=['POST'])
+def analyze_with_llm():
+    # Check if required data is in the request
+    if not request.json:
+        return jsonify({"error": "No JSON data provided"}), 400
+    
+    # Extract vision results and user query from request
+    data = request.json
+    if 'visionResults' not in data or 'userQuery' not in data:
+        return jsonify({"error": "Missing required fields: visionResults or userQuery"}), 400
+    
+    vision_results = data['visionResults']
+    user_query = data['userQuery']
+    
+    # Process the query with LLM
+    result = process_llm_query(vision_results, user_query)
+    
     return jsonify(result)
 
 @app.route('/api/status', methods=['GET'])

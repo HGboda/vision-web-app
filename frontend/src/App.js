@@ -14,6 +14,7 @@ import {
 import ImageUploader from './components/ImageUploader';
 import ModelSelector from './components/ModelSelector';
 import ResultDisplay from './components/ResultDisplay';
+import LlmAnalysis from './components/LlmAnalysis';
 import './App.css';
 
 // Create a theme
@@ -181,9 +182,14 @@ function App() {
             )}
             
             {results && (
-              <Grid item xs={12}>
-                <ResultDisplay results={results} />
-              </Grid>
+              <>
+                <Grid item xs={12}>
+                  <ResultDisplay results={results} />
+                </Grid>
+                <Grid item xs={12}>
+                  <LlmAnalysis visionResults={results.data} model={results.model} />
+                </Grid>
+              </>
             )}
           </Grid>
         </Container>

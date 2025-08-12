@@ -10,6 +10,7 @@ import {
   Grid,
   Chip
 } from '@material-ui/core';
+import VectorDBActions from './VectorDBActions';
 import { makeStyles } from '@material-ui/core/styles';
 
 const useStyles = makeStyles((theme) => ({
@@ -135,6 +136,9 @@ const ResultDisplay = ({ results }) => {
         </Grid>
         
         {renderPerformanceInfo()}
+        
+        {/* Vector DB Actions for Object Detection */}
+        <VectorDBActions results={results} />
       </Paper>
     );
   }
@@ -181,6 +185,9 @@ const ResultDisplay = ({ results }) => {
         )}
         
         {renderPerformanceInfo()}
+        
+        {/* Vector DB Actions for ViT Classification */}
+        <VectorDBActions results={results} />
       </Paper>
     );
   }
