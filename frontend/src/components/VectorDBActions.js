@@ -201,7 +201,15 @@ const VectorDBActions = ({ results }) => {
         throw new Error(result.error);
       }
       
-      setSearchResults(result);
+      console.log('Search API response:', result);
+      
+      // 백엔드는 {success, searchType, results} 구조로 응답하므로 results 배열만 추출
+      if (result.success && Array.isArray(result.results)) {
+        setSearchResults(result.results);
+      } else {
+        console.error('Unexpected API response format:', result);
+        throw new Error('Unexpected API response format');
+      }
     } catch (err) {
       console.error('Error searching vector DB:', err);
       setSearchError(`Error searching vector DB: ${err.message}`);
