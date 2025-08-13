@@ -107,7 +107,7 @@ const VectorDBActions = ({ results }) => {
           },
           body: JSON.stringify({
             image: data.image,
-            objects: data.objects,
+            objects: data.detections,
             image_id: generateUUID()
           })
         });
