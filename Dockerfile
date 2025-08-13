@@ -6,9 +6,13 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     build-essential \
     git \
-    libgl1-mesa-glx \
+    libgl1 \
     libglib2.0-0 \
+    wget \
     && rm -rf /var/lib/apt/lists/*
+    
+# Create cache directory with proper permissions
+RUN mkdir -p /.cache && chmod 777 /.cache
 
 # Copy requirements first for better caching
 COPY requirements.txt .
@@ -18,8 +22,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY api.py .
 COPY static/ static/
 
-# Copy frontend build files
-COPY frontend/build/ static/
+# Static files are already copied in the previous step
+# No need to copy frontend build files separately
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
