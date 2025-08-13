@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from flask import Flask, request, jsonify, send_from_directory
 import torch
 from PIL import Image
@@ -12,6 +13,12 @@ from matplotlib.patches import Rectangle
 import time
 from flask_cors import CORS
 import json
+
+# Fix for SQLite3 version compatibility with ChromaDB
+import sys
+import pysqlite3
+sys.modules['sqlite3'] = pysqlite3
+
 import chromadb
 from chromadb.utils import embedding_functions
 
@@ -546,29 +553,54 @@ def add_to_collection():
         return jsonify({"error": "Image embedding model or vector DB not available"})
 
     try:
-        # 요청에서 이미지 데이터 추출
-        if 'image' not in request.files and 'image' not in request.form:
-            return jsonify({"error": "No image provided"})
-
-        # 메타데이터 추출
+        # JSON 또는 form-data 모두 지원
         metadata = {}
-        if 'metadata' in request.form:
-            metadata = json.loads(request.form['metadata'])
+        image_id = None
+        image = None
+        image_base64 = None
 
-        # 이미지 ID (제공되지 않은 경우 자동 생성)
-        image_id = request.form.get('id', str(uuid.uuid4()))
-
-        if 'image' in request.files:
-            # 파일로 업로드된 경우
-            image_file = request.files['image']
-            image = Image.open(image_file).convert('RGB')
-        else:
-            # base64로 인코딩된 경우
-            image_data = request.form['image']
-            if image_data.startswith('data:image'):
-                # Remove the data URL prefix if present
+        if request.is_json:
+            data = request.get_json(silent=True) or {}
+            if 'image' not in data:
+                return jsonify({"error": "No image provided"})
+            image_id = data.get('id', str(uuid.uuid4()))
+            metadata = data.get('metadata', {}) or {}
+            image_data = data['image']
+            if isinstance(image_data, str) and image_data.startswith('data:image'):
                 image_data = image_data.split(',')[1]
             image = Image.open(BytesIO(base64.b64decode(image_data))).convert('RGB')
+            image_base64 = image_data
+        else:
+            # 요청에서 이미지 데이터 추출 (form)
+            if 'image' not in request.files and 'image' not in request.form:
+                return jsonify({"error": "No image provided"})
+
+            # 메타데이터 추출
+            if 'metadata' in request.form:
+                metadata = json.loads(request.form['metadata'])
+
+            # 이미지 ID (제공되지 않은 경우 자동 생성)
+            image_id = request.form.get('id', str(uuid.uuid4()))
+
+            if 'image' in request.files:
+                # 파일로 업로드된 경우
+                image_file = request.files['image']
+                image = Image.open(image_file).convert('RGB')
+                # 이미지를 base64로 인코딩하여 메타데이터에 저장
+                buffered = io.BytesIO()
+                image.save(buffered, format="JPEG")
+                image_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
+            else:
+                # base64로 인코딩된 경우
+                image_data = request.form['image']
+                if image_data.startswith('data:image'):
+                    # Remove the data URL prefix if present
+                    image_data = image_data.split(',')[1]
+                image = Image.open(BytesIO(base64.b64decode(image_data))).convert('RGB')
+                image_base64 = image_data  # 이미 base64 형식
+
+        # 이미지 데이터를 메타데이터에 추가
+        metadata['image_data'] = image_base64
 
         # 이미지 임베딩 생성
         embedding = generate_image_embedding(image)
@@ -590,6 +622,163 @@ def add_to_collection():
 
     except Exception as e:
         print("Error in add-to-collection API: {}".format(e))
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/add-detected-objects', methods=['POST'])
+def add_detected_objects():
+    """객체 인식 결과를 벡터 DB에 추가하는 API (JSON 지원)"""
+    if clip_model is None or object_collection is None:
+        return jsonify({"error": "Image embedding model or vector DB not available"})
+
+    try:
+        data = request.get_json(silent=True) or {}
+        if not data:
+            return jsonify({"error": "No data received"})
+
+        if 'image' not in data or 'objects' not in data:
+            return jsonify({"error": "Missing image or objects data"})
+
+        image_data = data['image']
+        if isinstance(image_data, str) and image_data.startswith('data:image'):
+            image_data = image_data.split(',')[1]
+
+        image = Image.open(BytesIO(base64.b64decode(image_data))).convert('RGB')
+        image_width, image_height = image.size
+
+        image_id = data.get('imageId', str(uuid.uuid4()))
+
+        object_ids = []
+        object_embeddings = []
+        object_metadatas = []
+
+        for obj in data.get('objects', []):
+            object_id = f"{image_id}_{str(uuid.uuid4())[:8]}"
+
+            bbox = obj.get('bbox', [])
+            # bbox could be [x1,y1,x2,y2] in absolute pixels from frontend; normalize to [0-1]
+            if isinstance(bbox, list) and len(bbox) >= 4:
+                x1, y1, x2, y2 = bbox[:4]
+                nx1 = x1 / image_width
+                ny1 = y1 / image_height
+                nx2 = x2 / image_width
+                ny2 = y2 / image_height
+                nwidth = nx2 - nx1
+                nheight = ny2 - ny1
+            elif isinstance(bbox, dict):
+                nx1 = bbox.get('x', 0)
+                ny1 = bbox.get('y', 0)
+                nwidth = bbox.get('width', 0)
+                nheight = bbox.get('height', 0)
+            else:
+                nx1 = ny1 = nwidth = nheight = 0
+
+            # crop using absolute pixels
+            x1_px = int(nx1 * image_width)
+            y1_px = int(ny1 * image_height)
+            w_px = int(nwidth * image_width)
+            h_px = int(nheight * image_height)
+            try:
+                object_image = image.crop((x1_px, y1_px, x1_px + w_px, y1_px + h_px))
+            except Exception:
+                # fallback: if bbox was absolute already
+                try:
+                    object_image = image.crop((int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3])))
+                except Exception:
+                    continue
+
+            embedding = generate_image_embedding(object_image)
+            if embedding is None:
+                continue
+
+            buffered = BytesIO()
+            object_image.save(buffered, format="JPEG")
+            obj_b64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
+
+            bbox_json = json.dumps({
+                "x": nx1, "y": ny1, "width": nwidth, "height": nheight
+            })
+
+            metadata = {
+                "image_id": image_id,
+                "class": obj.get('class', ''),
+                "confidence": obj.get('confidence', 0),
+                "bbox": bbox_json,
+                "image_data": obj_b64
+            }
+
+            object_ids.append(object_id)
+            object_embeddings.append(embedding)
+            object_metadatas.append(metadata)
+
+        if not object_ids:
+            return jsonify({"error": "No valid objects to add"})
+
+        object_collection.add(
+            ids=object_ids,
+            embeddings=object_embeddings,
+            metadatas=object_metadatas
+        )
+
+        return jsonify({
+            "success": True,
+            "image_id": image_id,
+            "object_count": len(object_ids),
+            "object_ids": object_ids
+        })
+    except Exception as e:
+        print("Error in add-detected-objects API: {}".format(e))
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/search-similar-objects', methods=['POST'])
+def search_similar_objects():
+    """유사한 객체 검색 API (JSON)"""
+    if clip_model is None or object_collection is None:
+        return jsonify({"error": "Image embedding model or vector DB not available"})
+
+    try:
+        data = request.get_json(silent=True) or {}
+        if not data:
+            return jsonify({"error": "Missing request data"})
+
+        search_type = data.get('searchType', 'image')
+        n_results = int(data.get('n_results', 5))
+
+        query_embedding = None
+
+        if search_type == 'image' and 'image' in data:
+            image_data = data['image']
+            if isinstance(image_data, str) and image_data.startswith('data:image'):
+                image_data = image_data.split(',')[1]
+            image = Image.open(BytesIO(base64.b64decode(image_data))).convert('RGB')
+            query_embedding = generate_image_embedding(image)
+        elif search_type == 'object' and 'objectId' in data:
+            result = object_collection.get(ids=[data['objectId']], include=["embeddings"])
+            if result and "embeddings" in result and len(result["embeddings"]) > 0:
+                query_embedding = result["embeddings"][0]
+        elif search_type == 'class' and 'class_name' in data:
+            results = object_collection.query(
+                query_embeddings=None,
+                where={"class": {"$eq": data['class_name']}},
+                n_results=n_results,
+                include=["metadatas", "distances"]
+            )
+            formatted = format_object_results(results)
+            return jsonify({"success": True, "searchType": "class", "results": formatted})
+        else:
+            return jsonify({"error": "Invalid search parameters"})
+
+        if query_embedding is None:
+            return jsonify({"error": "Failed to generate query embedding"})
+
+        results = object_collection.query(
+            query_embeddings=[query_embedding],
+            n_results=n_results,
+            include=["metadatas", "distances"]
+        )
+        formatted = format_object_results(results)
+        return jsonify({"success": True, "searchType": search_type, "results": formatted})
+    except Exception as e:
+        print("Error in search-similar-objects API: {}".format(e))
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/status', methods=['GET'])
@@ -646,6 +835,10 @@ def add_object_to_collection():
             # 파일로 업로드된 경우
             image_file = request.files['image']
             full_image = Image.open(image_file).convert('RGB')
+            # 원본 이미지 데이터를 base64로 변환
+            image_data_raw = io.BytesIO()
+            full_image.save(image_data_raw, format="JPEG")
+            image_data = base64.b64encode(image_data_raw.getvalue()).decode('utf-8')
         else:
             # base64로 인코딩된 경우
             image_data = request.form['image']
@@ -656,6 +849,12 @@ def add_object_to_collection():
 
         # 바운딩 박스에서 객체 이미지 추출
         object_image = full_image.crop((bbox[0], bbox[1], bbox[2], bbox[3]))
+        
+        # 객체 이미지를 base64로 변환하여 메타데이터에 추가
+        buffered = io.BytesIO()
+        object_image.save(buffered, format="JPEG")
+        object_image_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
+        metadata['image_data'] = object_image_base64
 
         # 객체 이미지 임베딩 생성
         embedding = generate_image_embedding(object_image)

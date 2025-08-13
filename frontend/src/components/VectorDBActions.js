@@ -85,7 +85,7 @@ const VectorDBActions = ({ results }) => {
       
       if (model === 'vit') {
         // For ViT, save the whole image with classifications
-        response = await fetch('/api/add-image', {
+        response = await fetch('/api/add-to-collection', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -108,7 +108,7 @@ const VectorDBActions = ({ results }) => {
           body: JSON.stringify({
             image: data.image,
             objects: data.detections,
-            image_id: generateUUID()
+            imageId: generateUUID()
           })
         });
       }
@@ -168,6 +168,7 @@ const VectorDBActions = ({ results }) => {
       if (searchType === 'image') {
         // Search by current image
         requestBody = {
+          searchType: 'image',
           image: data.image,
           n_results: 5
         };
@@ -178,6 +179,7 @@ const VectorDBActions = ({ results }) => {
         }
         
         requestBody = {
+          searchType: 'class',
           class_name: searchClass.trim(),
           n_results: 5
         };
@@ -205,6 +207,9 @@ const VectorDBActions = ({ results }) => {
       
       // 백엔드는 {success, searchType, results} 구조로 응답하므로 results 배열만 추출
       if (result.success && Array.isArray(result.results)) {
+        console.log('Setting search results array:', result.results);
+        console.log('Results array length:', result.results.length);
+        console.log('First result item:', result.results[0]);
         setSearchResults(result.results);
       } else {
         console.error('Unexpected API response format:', result);
@@ -229,7 +234,11 @@ const VectorDBActions = ({ results }) => {
   
   // Render search results
   const renderSearchResults = () => {
+    console.log('Rendering search results:', searchResults);
+    console.log('Search results length:', searchResults.length);
+    
     if (searchResults.length === 0) {
+      console.log('No results to render');
       return (
         <Typography variant="body1">No results found.</Typography>
       );
@@ -243,11 +252,30 @@ const VectorDBActions = ({ results }) => {
           return (
             <Grid item xs={12} sm={6} key={index}>
               <Card className={classes.resultCard}>
-                <CardMedia
-                  className={classes.resultImage}
-                  image={`data:image/jpeg;base64,${result.image}`}
-                  title={`Result ${index + 1}`}
-                />
+                {result.metadata && result.metadata.image_data ? (
+                  <CardMedia
+                    className={classes.resultImage}
+                    component="img"
+                    height="200"
+                    image={`data:image/jpeg;base64,${result.metadata.image_data}`}
+                    alt={result.metadata && result.metadata.class ? result.metadata.class : 'Object'}
+                  />
+                ) : (
+                  <Box 
+                    className={classes.resultImage}
+                    style={{ 
+                      backgroundColor: '#f0f0f0', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      height: 200
+                    }}
+                  >
+                    <Typography variant="body2" color="textSecondary">
+                      {result.metadata && result.metadata.class ? result.metadata.class : 'Object'} Image
+                    </Typography>
+                  </Box>
+                )}
                 <CardContent>
                   <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
                     <Typography variant="subtitle1">Result #{index + 1}</Typography>
@@ -376,7 +404,12 @@ const VectorDBActions = ({ results }) => {
                 </Typography>
               </Box>
             ) : (
-              searchResults.length > 0 && renderSearchResults()
+              <>
+                {console.log('Search dialog render - searchResults:', searchResults)}
+                {searchResults.length > 0 ? renderSearchResults() : 
+                  <Typography variant="body1">No results found. Please try another search.</Typography>
+                }
+              </>
             )}
           </Box>
         </DialogContent>

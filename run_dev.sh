@@ -32,9 +32,9 @@ if [ ! -d "frontend/node_modules" ]; then
     cd frontend && npm install && cd ..
 fi
 
-# Start the Flask backend in the background
-echo -e "${BLUE}Starting Flask backend server...${NC}"
-python api.py &
+# Start the Flask backend in the background (on port 5000 to match React proxy)
+echo -e "${BLUE}Starting Flask backend server on port 5000...${NC}"
+PORT=5000 python3 api.py &
 BACKEND_PID=$!
 
 # Give the backend a moment to start
