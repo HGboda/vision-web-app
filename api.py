@@ -1171,6 +1171,7 @@ def logout():
 @login_required
 def serve_react(path):
     """Serve React frontend"""
+    print(f"Serving React frontend for path: {path}, user: {current_user.username}")
     if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
         return send_from_directory(app.static_folder, path)
     else:
@@ -1208,11 +1209,8 @@ def status():
         "user": current_user.username
     })
 
-@app.route('/')
-@login_required
-def index():
-    print(f"Root route accessed, user authenticated: {current_user.is_authenticated}")
-    return send_from_directory('static', 'index.html')
+# Root route is now handled by serve_react function
+# This route is removed to prevent conflicts
 
 @app.route('/index')
 @login_required
