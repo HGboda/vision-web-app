@@ -11,6 +11,7 @@ timm>=0.9.0  # Vision Transformer support
 # API dependencies
 flask>=2.0.0
 flask-cors>=3.0.0
+flask-login>=0.6.2
 matplotlib>=3.5.0
 numpy>=1.20.0
 

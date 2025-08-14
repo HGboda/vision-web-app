@@ -3,7 +3,7 @@
 import os
 os.environ['MPLCONFIGDIR'] = '/tmp/matplotlib'
 
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, redirect, url_for, session, render_template_string
 import torch
 from PIL import Image
 import numpy as np
@@ -17,6 +17,7 @@ import time
 from flask_cors import CORS
 import json
 import sys
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 
 # Fix for SQLite3 version compatibility with ChromaDB
 try:
@@ -30,6 +31,34 @@ from chromadb.utils import embedding_functions
 
 app = Flask(__name__, static_folder='static')
 CORS(app)  # Enable CORS for all routes
+
+# 시크릿 키 설정 (세션 암호화에 사용)
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'vision_llm_agent_secret_key')
+
+# Flask-Login 설정
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+
+# 사용자 클래스 정의
+class User(UserMixin):
+    def __init__(self, id, username, password):
+        self.id = id
+        self.username = username
+        self.password = password
+
+# 테스트용 사용자 (실제 환경에서는 데이터베이스 사용 권장)
+users = {
+    'admin': User('1', 'admin', 'admin123'),
+    'user': User('2', 'user', 'user123')
+}
+
+@login_manager.user_loader
+def load_user(user_id):
+    for user in users.values():
+        if user.id == user_id:
+            return user
+    return None
 
 # Model initialization
 print("Loading models... This may take a moment.")
@@ -434,6 +463,7 @@ def process_vit(image):
     }
 
 @app.route('/api/detect/yolo', methods=['POST'])
+@login_required
 def yolo_detect():
     if 'image' not in request.files:
         return jsonify({"error": "No image provided"}), 400
@@ -445,6 +475,7 @@ def yolo_detect():
     return jsonify(result)
 
 @app.route('/api/detect/detr', methods=['POST'])
+@login_required
 def detr_detect():
     if 'image' not in request.files:
         return jsonify({"error": "No image provided"}), 400
@@ -456,6 +487,7 @@ def detr_detect():
     return jsonify(result)
 
 @app.route('/api/classify/vit', methods=['POST'])
+@login_required
 def vit_classify():
     if 'image' not in request.files:
         return jsonify({"error": "No image provided"}), 400
@@ -467,6 +499,7 @@ def vit_classify():
     return jsonify(result)
 
 @app.route('/api/analyze', methods=['POST'])
+@login_required
 def analyze_with_llm():
     # Check if required data is in the request
     if not request.json:
@@ -508,6 +541,7 @@ def generate_image_embedding(image):
         return None
 
 @app.route('/api/similar-images', methods=['POST'])
+@login_required
 def find_similar_images():
     """유사 이미지 검색 API"""
     if clip_model is None or clip_processor is None or image_collection is None:
@@ -570,6 +604,7 @@ def find_similar_images():
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/add-to-collection', methods=['POST'])
+@login_required
 def add_to_collection():
     """이미지를 벡터 DB에 추가하는 API"""
     if clip_model is None or clip_processor is None or image_collection is None:
@@ -629,6 +664,7 @@ def add_to_collection():
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/add-detected-objects', methods=['POST'])
+@login_required
 def add_detected_objects():
     """객체 인식 결과를 벡터 DB에 추가하는 API"""
     if clip_model is None or object_collection is None:
@@ -782,6 +818,7 @@ def add_detected_objects():
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/search-similar-objects', methods=['POST'])
+@login_required
 def search_similar_objects():
     """유사한 객체 검색 API"""
     print("[DEBUG] Received request in search-similar-objects")
@@ -987,8 +1024,119 @@ def format_object_results(results):
     
     return formatted_results
 
+# 로그인 페이지 HTML 템플릿
+LOGIN_TEMPLATE = '''
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vision LLM Agent - 로그인</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .login-container {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+        }
+        h1 {
+            text-align: center;
+            color: #4a6cf7;
+            margin-bottom: 1.5rem;
+        }
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: bold;
+        }
+        input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+        button {
+            width: 100%;
+            padding: 0.75rem;
+            background-color: #4a6cf7;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 1rem;
+            cursor: pointer;
+            margin-top: 1rem;
+        }
+        button:hover {
+            background-color: #3a5cd8;
+        }
+        .error-message {
+            color: #e74c3c;
+            margin-top: 1rem;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <h1>Vision LLM Agent</h1>
+        <form action="/login" method="post">
+            <div class="form-group">
+                <label for="username">사용자 ID</label>
+                <input type="text" id="username" name="username" required>
+            </div>
+            <div class="form-group">
+                <label for="password">비밀번호</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <button type="submit">로그인</button>
+            {% if error %}
+            <p class="error-message">{{ error }}</p>
+            {% endif %}
+        </form>
+    </div>
+</body>
+</html>
+'''
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    error = None
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        if username in users and users[username].password == password:
+            login_user(users[username])
+            next_page = request.args.get('next')
+            return redirect(next_page or url_for('index'))
+        else:
+            error = '잘못된 사용자 ID 또는 비밀번호입니다.'
+    
+    return render_template_string(LOGIN_TEMPLATE, error=error)
+
+@app.route('/logout')
+def logout():
+    logout_user()
+    return redirect(url_for('login'))
+
 @app.route('/', defaults={'path': ''}, methods=['GET'])
 @app.route('/<path:path>', methods=['GET'])
+@login_required
 def serve_react(path):
     """Serve React frontend"""
     if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
@@ -997,21 +1145,25 @@ def serve_react(path):
         return send_from_directory(app.static_folder, 'index.html')
 
 @app.route('/similar-images', methods=['GET'])
+@login_required
 def similar_images_page():
     """Serve similar images search page"""
     return send_from_directory(app.static_folder, 'similar-images.html')
 
 @app.route('/object-detection-search', methods=['GET'])
+@login_required
 def object_detection_search_page():
     """Serve object detection search page"""
     return send_from_directory(app.static_folder, 'object-detection-search.html')
 
 @app.route('/model-vector-db', methods=['GET'])
+@login_required
 def model_vector_db_page():
     """Serve model vector DB UI page"""
     return send_from_directory(app.static_folder, 'model-vector-db.html')
 
 @app.route('/api/status', methods=['GET'])
+@login_required
 def status():
     return jsonify({
         "status": "online",
@@ -1020,9 +1172,12 @@ def status():
             "detr": detr_model is not None and detr_processor is not None,
             "vit": vit_model is not None and vit_processor is not None
         },
-        "device": "GPU" if torch.cuda.is_available() else "CPU"
+        "device": "GPU" if torch.cuda.is_available() else "CPU",
+        "user": current_user.username
     })
 
+@app.route('/index')
+@login_required
 def index():
     return send_from_directory('static', 'index.html')
 

@@ -10,7 +10,7 @@ license: gpl-3.0
 
 # Vision LLM Agent - Object Detection with AI Assistant
 
-A multi-model object detection and image classification demo with LLM-based AI assistant for answering questions about detected objects. This project uses YOLOv8, DETR, and ViT models for vision tasks, and TinyLlama for natural language processing.
+A multi-model object detection and image classification demo with LLM-based AI assistant for answering questions about detected objects. This project uses YOLOv8, DETR, and ViT models for vision tasks, and TinyLlama for natural language processing. The application includes a secure login system to protect access to the AI features.
 
 ## Project Architecture
 
@@ -86,14 +86,37 @@ This project follows a phased development approach:
 - **ViT**: Vision Transformer for image classification
 - **TinyLlama**: For natural language processing and question answering about detected objects
 
+## Authentication
+
+The application includes a secure login system to protect access to all features:
+
+- **Default Credentials**:
+  - Username: `admin` / Password: `admin123`
+  - Username: `user` / Password: `user123`
+
+- **Login Process**:
+  - All routes and API endpoints are protected with Flask-Login
+  - Users must authenticate before accessing any features
+  - Session management handles login state persistence
+
+- **Security Features**:
+  - Password protection for all API endpoints and UI pages
+  - Session-based authentication with secure cookies
+  - Configurable secret key via environment variables
+
 ## API Endpoints
 
-The Flask backend provides the following API endpoints:
+The Flask backend provides the following API endpoints (all require authentication):
 
 - `GET /api/status` - Check the status of the API and available models
 - `POST /api/detect/yolo` - Detect objects using YOLOv8
 - `POST /api/detect/detr` - Detect objects using DETR
 - `POST /api/classify/vit` - Classify images using ViT
+- `POST /api/analyze` - Analyze images with LLM assistant
+- `POST /api/similar-images` - Find similar images in the vector database
+- `POST /api/add-to-collection` - Add images to the vector database
+- `POST /api/add-detected-objects` - Add detected objects to the vector database
+- `POST /api/search-similar-objects` - Search for similar objects in the vector database
 
 All POST endpoints accept form data with an 'image' field containing the image file.
 
