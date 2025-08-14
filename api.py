@@ -1270,10 +1270,8 @@ def serve_index_html():
     # 세션 상태 디버그
     print(f"Session data: user_id={session.get('user_id')}, username={session.get('username')}, is_permanent={session.get('permanent', False)}")
     
-    # 세션 유지를 위해 세션 업데이트
-    session['user_id'] = current_user.id
-    session['username'] = current_user.username
-    session.modified = True
+    # 세션 만료를 의도대로 유지하기 위해 여기서 세션을 갱신하지 않습니다.
+    # 주의: 세션에 쓰기(또는 session.modified=True)는 Flask-Session에서 만료시간을 연장할 수 있습니다.
     
     # index.html을 읽어 하트비트 스크립트를 주입
     index_path = os.path.join(app.static_folder, 'index.html')
