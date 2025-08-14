@@ -1288,8 +1288,9 @@ def serve_index_html():
     <script>
     (function(){
       function checkSession(){
-        fetch('/api/status', {credentials: 'include'}).then(function(res){
-          if(res.status !== 200){
+        fetch('/api/status', {credentials: 'include', redirect: 'manual'}).then(function(res){
+          var redirected = res.redirected || (res.url && res.url.indexOf('/login') !== -1);
+          if(res.status !== 200 || redirected){
             window.location.href = '/login';
           }
         }).catch(function(){
@@ -1352,8 +1353,9 @@ def serve_react(path):
         <script>
         (function(){
           function checkSession(){
-            fetch('/api/status', {credentials: 'include'}).then(function(res){
-              if(res.status !== 200){
+            fetch('/api/status', {credentials: 'include', redirect: 'manual'}).then(function(res){
+              var redirected = res.redirected || (res.url && res.url.indexOf('/login') !== -1);
+              if(res.status !== 200 || redirected){
                 window.location.href = '/login';
               }
             }).catch(function(){
