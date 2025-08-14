@@ -43,6 +43,13 @@ login_manager.init_app(app)
 login_manager.login_view = 'login'
 login_manager.session_protection = 'strong'
 
+# 세션 설정
+from flask_session import Session
+app.config['SESSION_TYPE'] = 'filesystem'
+app.config['SESSION_PERMANENT'] = True
+app.config['SESSION_USE_SIGNER'] = True
+Session(app)
+
 # 사용자 클래스 정의
 class User(UserMixin):
     def __init__(self, id, username, password):
@@ -1129,7 +1136,7 @@ def login():
     # 이미 로그인된 사용자는 메인 페이지로 리디렉션
     if current_user.is_authenticated:
         print(f"User already authenticated as: {current_user.username}, redirecting to index")
-        return redirect('/index')
+        return redirect('/index.html')
     
     error = None
     if request.method == 'POST':
@@ -1153,8 +1160,8 @@ def login():
             if next_page and next_page.startswith('/') and next_page != '/login':
                 print(f"Redirecting to: {next_page}")
                 return redirect(next_page)
-            print("Redirecting to static index.html")
-            return send_from_directory(app.static_folder, 'index.html')
+            print("Redirecting to index.html")
+            return redirect('/index.html')
         else:
             error = 'Invalid username or password'
             print(f"Login failed: {error}")
@@ -1166,21 +1173,31 @@ def logout():
     logout_user()
     return redirect(url_for('login'))
 
+# 정적 파일 서빙을 위한 라우트 (로그인 불필요)
+@app.route('/static/<path:filename>')
+def serve_static(filename):
+    print(f"Serving static file: {filename}")
+    return send_from_directory(app.static_folder, filename)
+
+# 인덱스 HTML 직접 서빙 (로그인 필요)
+@app.route('/index.html')
+@login_required
+def serve_index_html():
+    print(f"Serving index.html for user: {current_user.username if current_user.is_authenticated else 'not authenticated'}")
+    return send_from_directory(app.static_folder, 'index.html')
+
+# 기본 경로 및 기타 경로 처리 (로그인 필요)
 @app.route('/', defaults={'path': ''}, methods=['GET'])
 @app.route('/<path:path>', methods=['GET'])
 @login_required
 def serve_react(path):
     """Serve React frontend"""
     print(f"Serving React frontend for path: {path}, user: {current_user.username if current_user.is_authenticated else 'not authenticated'}")
-    # Handle static files directly
-    if path.startswith('static/'):
-        file_path = path[7:]  # Remove 'static/' prefix
-        return send_from_directory(app.static_folder, file_path)
-    # Handle other static files in root of static folder
-    elif path != "" and os.path.exists(os.path.join(app.static_folder, path)):
+    # 정적 파일 처리는 이제 별도 라우트에서 처리
+    if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
         return send_from_directory(app.static_folder, path)
     else:
-        # Serve the React app's index.html for all other routes
+        # React 앱의 index.html 서빙
         return send_from_directory(app.static_folder, 'index.html')
 
 @app.route('/similar-images', methods=['GET'])
@@ -1221,9 +1238,9 @@ def status():
 @app.route('/index')
 @login_required
 def index_page():
-    # /index 경로도 루트 경로와 동일하게 처리
-    print("Index route redirecting to root")
-    return redirect('/')
+    # /index 경로는 index.html로 리디렉션
+    print("Index route redirecting to index.html")
+    return redirect('/index.html')
 
 if __name__ == "__main__":
     # 허깅페이스 Space에서는 PORT 환경 변수를 사용합니다
