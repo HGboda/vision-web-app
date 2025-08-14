@@ -48,7 +48,8 @@ CORS(app)  # Enable CORS for all routes
 # 시크릿 키 설정 (세션 암호화에 사용)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'vision_llm_agent_secret_key')
 app.config['SESSION_TYPE'] = 'filesystem'
-app.config['PERMANENT_SESSION_LIFETIME'] = 120  # 세션 유효 시간 (초)
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(seconds=120)  # 세션 유효 시간 (2분)
+app.config['SESSION_REFRESH_EACH_REQUEST'] = False  # 절대 만료(로그인 기준 2분 후 만료)
 
 # Flask-Login 설정
 login_manager = LoginManager()
@@ -1139,14 +1140,17 @@ LOGIN_TEMPLATE = '''
 <body>
     <div class="login-container">
         <h1>Vision LLM Agent</h1>
-        <form action="/login" method="post">
+        <form action="/login" method="post" autocomplete="off">
+            <!-- hidden dummy fields to discourage Chrome autofill -->
+            <input type="text" name="fakeusernameremembered" style="display:none" tabindex="-1" autocomplete="off">
+            <input type="password" name="fakepasswordremembered" style="display:none" tabindex="-1" autocomplete="off">
             <div class="form-group">
                 <label for="username">Username</label>
-                <input type="text" id="username" name="username" required>
+                <input type="text" id="username" name="username" required autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false">
             </div>
             <div class="form-group">
                 <label for="password">Password</label>
-                <input type="password" id="password" name="password" required>
+                <input type="password" id="password" name="password" required autocomplete="current-password" autocapitalize="none" autocorrect="off" spellcheck="false">
             </div>
             <button type="submit">Login</button>
             {% if error %}
@@ -1199,6 +1203,11 @@ def login():
 @app.route('/logout')
 def logout():
     logout_user()
+    # Clear server-side session fully
+    try:
+        session.clear()
+    except Exception as e:
+        print(f"[DEBUG] Error clearing session on logout: {e}")
     return redirect(url_for('login'))
 
 # 정적 파일 서빙을 위한 라우트 (로그인 불필요)
@@ -1229,7 +1238,12 @@ def serve_index_html():
     session['username'] = current_user.username
     session.modified = True
     
-    return send_from_directory(app.static_folder, 'index.html')
+    resp = send_from_directory(app.static_folder, 'index.html')
+    # Prevent sensitive pages from being cached
+    resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    resp.headers['Pragma'] = 'no-cache'
+    resp.headers['Expires'] = '0'
+    return resp
 
 # 기본 경로 및 기타 경로 처리 (로그인 필요)
 @app.route('/', defaults={'path': ''}, methods=['GET'])
@@ -1240,28 +1254,48 @@ def serve_react(path):
     print(f"Serving React frontend for path: {path}, user: {current_user.username if current_user.is_authenticated else 'not authenticated'}")
     # 정적 파일 처리는 이제 별도 라우트에서 처리
     if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
-        return send_from_directory(app.static_folder, path)
+        resp = send_from_directory(app.static_folder, path)
+        resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        resp.headers['Pragma'] = 'no-cache'
+        resp.headers['Expires'] = '0'
+        return resp
     else:
         # React 앱의 index.html 서빙
-        return send_from_directory(app.static_folder, 'index.html')
+        resp = send_from_directory(app.static_folder, 'index.html')
+        resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        resp.headers['Pragma'] = 'no-cache'
+        resp.headers['Expires'] = '0'
+        return resp
 
 @app.route('/similar-images', methods=['GET'])
 @login_required
 def similar_images_page():
     """Serve similar images search page"""
-    return send_from_directory(app.static_folder, 'similar-images.html')
+    resp = send_from_directory(app.static_folder, 'similar-images.html')
+    resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    resp.headers['Pragma'] = 'no-cache'
+    resp.headers['Expires'] = '0'
+    return resp
 
 @app.route('/object-detection-search', methods=['GET'])
 @login_required
 def object_detection_search_page():
     """Serve object detection search page"""
-    return send_from_directory(app.static_folder, 'object-detection-search.html')
+    resp = send_from_directory(app.static_folder, 'object-detection-search.html')
+    resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    resp.headers['Pragma'] = 'no-cache'
+    resp.headers['Expires'] = '0'
+    return resp
 
 @app.route('/model-vector-db', methods=['GET'])
 @login_required
 def model_vector_db_page():
     """Serve model vector DB UI page"""
-    return send_from_directory(app.static_folder, 'model-vector-db.html')
+    resp = send_from_directory(app.static_folder, 'model-vector-db.html')
+    resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    resp.headers['Pragma'] = 'no-cache'
+    resp.headers['Expires'] = '0'
+    return resp
 
 @app.route('/api/status', methods=['GET'])
 @login_required
