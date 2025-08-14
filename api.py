@@ -1256,7 +1256,12 @@ def logout():
 @app.route('/static/<path:filename>')
 def serve_static(filename):
     print(f"Serving static file: {filename}")
-    return send_from_directory(app.static_folder, filename)
+    resp = send_from_directory(app.static_folder, filename)
+    # Prevent caching of static assets to reflect latest frontend changes
+    resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    resp.headers['Pragma'] = 'no-cache'
+    resp.headers['Expires'] = '0'
+    return resp
 
 # 인덱스 HTML 직접 서빙 (로그인 필요)
 @app.route('/index.html')
