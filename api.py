@@ -1187,9 +1187,12 @@ LOGIN_TEMPLATE = '''
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     # 이미 로그인된 사용자는 메인 페이지로 리디렉션
-    if current_user.is_authenticated:
-        print(f"User already authenticated as: {current_user.username}, redirecting to index")
+    if current_user.is_authenticated and login_fresh():
+        print(f"User already authenticated and fresh as: {current_user.username}, redirecting to index")
         return redirect('/index.html')
+    elif current_user.is_authenticated and not login_fresh():
+        # Remember-cookie 상태 등 비-프레시 세션이면 로그인 페이지를 보여서 재인증 유도
+        print("User authenticated but session not fresh; showing login page for reauthentication")
     
     error = None
     if request.method == 'POST':
