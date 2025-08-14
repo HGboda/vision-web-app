@@ -49,6 +49,9 @@ class User(UserMixin):
         self.id = id
         self.username = username
         self.password = password
+    
+    def get_id(self):
+        return str(self.id)  # Flask-Login은 문자열 ID를 요구함
 
 # 테스트용 사용자 (실제 환경에서는 데이터베이스 사용 권장)
 users = {
@@ -56,11 +59,16 @@ users = {
     'user': User('2', 'user', 'user123')
 }
 
+# 사용자 로더 함수
 @login_manager.user_loader
 def load_user(user_id):
-    for user in users.values():
+    print(f"Loading user with ID: {user_id}")
+    # user_id가 문자열로 전달되기 때문에 사용자 이름으로 처리
+    for username, user in users.items():
         if user.id == user_id:
+            print(f"User found: {username}")
             return user
+    print(f"User not found with ID: {user_id}")
     return None
 
 # Model initialization
@@ -1118,6 +1126,11 @@ LOGIN_TEMPLATE = '''
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    # 이미 로그인된 사용자는 메인 페이지로 리디렉션
+    if current_user.is_authenticated:
+        print(f"User already authenticated as: {current_user.username}, redirecting to index")
+        return redirect('/index')
+    
     error = None
     if request.method == 'POST':
         username = request.form.get('username')
@@ -1133,13 +1146,15 @@ def login():
             session['username'] = username
             session.permanent = True
             
-            print(f"Login successful for user: {username}")
+            print(f"Login successful for user: {username}, ID: {user.id}")
             
             # 리디렉션 처리
             next_page = request.args.get('next')
             if next_page and next_page.startswith('/'):
+                print(f"Redirecting to: {next_page}")
                 return redirect(next_page)
-            return redirect('/')
+            print("Redirecting to index page")
+            return redirect('/index')
         else:
             error = 'Invalid username or password'
             print(f"Login failed: {error}")
@@ -1193,9 +1208,19 @@ def status():
         "user": current_user.username
     })
 
+@app.route('/')
+def index():
+    print(f"Root route accessed, user authenticated: {current_user.is_authenticated}")
+    if current_user.is_authenticated:
+        print(f"User is authenticated as: {current_user.id}")
+        return redirect('/index')
+    else:
+        print("User is not authenticated, redirecting to login")
+        return redirect(url_for('login'))
+
 @app.route('/index')
 @login_required
-def index():
+def index_page():
     return send_from_directory('static', 'index.html')
 
 if __name__ == "__main__":
