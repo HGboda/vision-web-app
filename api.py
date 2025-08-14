@@ -1150,11 +1150,11 @@ def login():
             
             # 리디렉션 처리
             next_page = request.args.get('next')
-            if next_page and next_page.startswith('/'):
+            if next_page and next_page.startswith('/') and next_page != '/login':
                 print(f"Redirecting to: {next_page}")
                 return redirect(next_page)
-            print("Redirecting to index page")
-            return redirect('/index')
+            print("Redirecting to root page")
+            return redirect('/')
         else:
             error = 'Invalid username or password'
             print(f"Login failed: {error}")
@@ -1209,19 +1209,17 @@ def status():
     })
 
 @app.route('/')
+@login_required
 def index():
     print(f"Root route accessed, user authenticated: {current_user.is_authenticated}")
-    if current_user.is_authenticated:
-        print(f"User is authenticated as: {current_user.id}")
-        return redirect('/index')
-    else:
-        print("User is not authenticated, redirecting to login")
-        return redirect(url_for('login'))
+    return send_from_directory('static', 'index.html')
 
 @app.route('/index')
 @login_required
 def index_page():
-    return send_from_directory('static', 'index.html')
+    # /index 경로도 루트 경로와 동일하게 처리
+    print("Index route redirecting to root")
+    return redirect('/')
 
 if __name__ == "__main__":
     # 허깅페이스 Space에서는 PORT 환경 변수를 사용합니다
