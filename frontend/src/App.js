@@ -15,6 +15,7 @@ import ImageUploader from './components/ImageUploader';
 import ModelSelector from './components/ModelSelector';
 import ResultDisplay from './components/ResultDisplay';
 import LlmAnalysis from './components/LlmAnalysis';
+import OpenAIChat from './components/OpenAIChat';
 import './App.css';
 
 // Create a theme
@@ -191,6 +192,11 @@ function App() {
                 </Grid>
               </>
             )}
+
+            {/* OpenAI Chat section at the end */}
+            <Grid item xs={12}>
+              <OpenAIChat />
+            </Grid>
           </Grid>
         </Container>
       </Box>
