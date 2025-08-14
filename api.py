@@ -66,7 +66,6 @@ app.config['SESSION_TYPE'] = 'filesystem'
 app.config['SESSION_PERMANENT'] = True
 app.config['SESSION_USE_SIGNER'] = True
 app.config['SESSION_FILE_DIR'] = session_dir
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)  # 세션 유효 기간 설정
 print(f"Using session directory: {session_dir}")
 Session(app)
 
@@ -1176,7 +1175,7 @@ def login():
         if username in users and users[username].password == password:
             # 로그인 성공 시 세션에 사용자 정보 저장
             user = users[username]
-            login_user(user, remember=True, duration=timedelta(days=7))  # remember me 기능 활성화 및 기간 설정
+            login_user(user, remember=False)  # 2분 세션 만료를 위해 remember 비활성화
             session['user_id'] = user.id
             session['username'] = username
             session.permanent = True
