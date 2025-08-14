@@ -1096,14 +1096,14 @@ LOGIN_TEMPLATE = '''
         <h1>Vision LLM Agent</h1>
         <form action="/login" method="post">
             <div class="form-group">
-                <label for="username">사용자 ID</label>
+                <label for="username">Username</label>
                 <input type="text" id="username" name="username" required>
             </div>
             <div class="form-group">
-                <label for="password">비밀번호</label>
+                <label for="password">Password</label>
                 <input type="password" id="password" name="password" required>
             </div>
-            <button type="submit">로그인</button>
+            <button type="submit">Login</button>
             {% if error %}
             <p class="error-message">{{ error }}</p>
             {% endif %}
@@ -1120,12 +1120,17 @@ def login():
         username = request.form.get('username')
         password = request.form.get('password')
         
+        print(f"Login attempt: username={username}")
+        
         if username in users and users[username].password == password:
             login_user(users[username])
             next_page = request.args.get('next')
-            return redirect(next_page or url_for('index'))
+            if next_page:
+                return redirect(next_page)
+            return redirect('/')
         else:
-            error = '잘못된 사용자 ID 또는 비밀번호입니다.'
+            error = 'Invalid username or password'
+            print(f"Login failed: {error}")
     
     return render_template_string(LOGIN_TEMPLATE, error=error)
 
