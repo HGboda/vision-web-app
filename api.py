@@ -1345,6 +1345,19 @@ def serve_index_html():
     resp.headers['Expires'] = '0'
     return resp
 
+# Static files should be accessible without login requirements
+@app.route('/static/<path:filename>')
+def static_files(filename):
+    print(f"Serving static file: {filename}")
+    return send_from_directory(app.static_folder, filename)
+
+# Add explicit handlers for JS files that are failing
+@app.route('/static/js/<path:filename>')
+def static_js_files(filename):
+    print(f"Serving JS file: {filename}")
+    js_path = os.path.join('js', filename)
+    return send_from_directory(app.static_folder, js_path)
+
 # 기본 경로 및 기타 경로 처리 (로그인 필요)
 @app.route('/', defaults={'path': ''}, methods=['GET'])
 @app.route('/<path:path>', methods=['GET'])
@@ -1545,10 +1558,6 @@ def index_page():
     print("Index route redirecting to index.html")
     return redirect('/index.html')
 
-@app.route('/static/<path:filename>')
-def static_files(filename):
-    print(f"Serving static file: {filename}")
-    return send_from_directory(app.static_folder, filename)
 
 if __name__ == "__main__":
     # 허깅페이스 Space에서는 PORT 환경 변수를 사용합니다
