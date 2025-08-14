@@ -14,12 +14,15 @@ flask-cors>=3.0.0
 flask-login>=0.6.2
 flask-session>=0.4.0
 matplotlib>=3.5.0
-numpy>=1.20.0
+# Prefer wheel-available versions; keep flexible to match PyPI wheels
+numpy>=1.24.4,<2.0.0; python_version < '3.12'
+numpy>=2.0.0,<2.3.0; python_version >= '3.12'
 
 # For future phases
 fastapi>=0.100.0
 uvicorn[standard]>=0.22.0
 python-multipart>=0.0.5
+requests>=2.31.0
 
 # Llama 4 integration
 accelerator>=0.20.0
@@ -30,6 +33,10 @@ protobuf>=4.23.0
 # Vector DB and image similarity search
 chroma-hnswlib>=0.7.3
 chromadb>=0.4.18
-scipy>=1.11.0
+scipy>=1.10.0,<1.14.0; python_version < '3.12'
+scipy>=1.14.1,<1.15.0; python_version >= '3.12'
 open-clip-torch>=2.20.0
 pysqlite3-binary>=0.5.0
+
+# OpenAI Python SDK
+openai>=1.30.0

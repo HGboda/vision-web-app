@@ -18,6 +18,11 @@ import time
 from flask_cors import CORS
 import json
 import sys
+import requests
+try:
+    from openai import OpenAI
+except Exception as _e:
+    OpenAI = None
 from flask_login import (
     LoginManager,
     UserMixin,
@@ -1446,6 +1451,70 @@ def model_vector_db_page():
     resp.headers['Pragma'] = 'no-cache'
     resp.headers['Expires'] = '0'
     return resp
+
+@app.route('/openai-chat', methods=['GET'])
+@fresh_login_required
+def openai_chat_page():
+    """Serve OpenAI chat UI page"""
+    resp = send_from_directory(app.static_folder, 'openai-chat.html')
+    resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    resp.headers['Pragma'] = 'no-cache'
+    resp.headers['Expires'] = '0'
+    return resp
+
+@app.route('/api/openai/chat', methods=['POST'])
+@fresh_login_required
+def openai_chat_api():
+    """Forward chat request to OpenAI Chat Completions API.
+    Expects JSON: { prompt: string, model?: string, api_key?: string, system?: string }
+    Uses OPENAI_API_KEY from environment if api_key not provided.
+    """
+    try:
+        data = request.get_json(force=True)
+    except Exception:
+        return jsonify({"error": "Invalid JSON body"}), 400
+
+    prompt = (data or {}).get('prompt', '').strip()
+    model = (data or {}).get('model') or os.environ.get('OPENAI_MODEL', 'gpt-4o-mini')
+    system = (data or {}).get('system') or 'You are a helpful assistant.'
+    api_key = (data or {}).get('api_key') or os.environ.get('OPENAI_API_KEY')
+
+    if not prompt:
+        return jsonify({"error": "Missing 'prompt'"}), 400
+    if not api_key:
+        return jsonify({"error": "Missing OpenAI API key. Provide in request or set OPENAI_API_KEY env."}), 400
+
+    # Prefer official Python SDK if available
+    if OpenAI is None:
+        return jsonify({"error": "OpenAI Python package not installed on server"}), 500
+
+    try:
+        start = time.time()
+        client = OpenAI(api_key=api_key)
+        chat = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": prompt},
+            ],
+        )
+        latency = round(time.time() - start, 3)
+    except Exception as e:
+        return jsonify({"error": f"OpenAI SDK call failed: {str(e)}"}), 502
+
+    try:
+        content = chat.choices[0].message.content if chat and chat.choices else ''
+        usage = getattr(chat, 'usage', None)
+        usage = usage.model_dump() if hasattr(usage, 'model_dump') else (usage or {})
+    except Exception as e:
+        return jsonify({"error": f"Failed to parse SDK response: {str(e)}"}), 500
+
+    return jsonify({
+        'response': content,
+        'model': model,
+        'usage': usage,
+        'latency_sec': latency
+    })
 
 @app.route('/api/status', methods=['GET'])
 @fresh_login_required
