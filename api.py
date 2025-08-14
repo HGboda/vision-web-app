@@ -66,6 +66,19 @@ login_manager.init_app(app)
 login_manager.login_view = 'login'
 login_manager.session_protection = 'strong'
 
+# When authentication is required or session is not fresh, redirect to login instead of 401
+login_manager.refresh_view = 'login'
+
+@login_manager.unauthorized_handler
+def handle_unauthorized():
+    # For non-authenticated access, send user to login
+    return redirect(url_for('login'))
+
+@login_manager.needs_refresh_handler
+def handle_needs_refresh():
+    # For non-fresh sessions (e.g., after expiry or only remember-cookie), send to login
+    return redirect(url_for('login'))
+
 # 세션 설정
 import tempfile
 from flask_session import Session
