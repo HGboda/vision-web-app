@@ -34,11 +34,14 @@ CORS(app)  # Enable CORS for all routes
 
 # 시크릿 키 설정 (세션 암호화에 사용)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'vision_llm_agent_secret_key')
+app.config['SESSION_TYPE'] = 'filesystem'
+app.config['PERMANENT_SESSION_LIFETIME'] = 3600  # 세션 유효 시간 (초)
 
 # Flask-Login 설정
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
+login_manager.session_protection = 'strong'
 
 # 사용자 클래스 정의
 class User(UserMixin):
@@ -1123,9 +1126,18 @@ def login():
         print(f"Login attempt: username={username}")
         
         if username in users and users[username].password == password:
-            login_user(users[username])
+            # 로그인 성공 시 세션에 사용자 정보 저장
+            user = users[username]
+            login_user(user, remember=True)
+            session['user_id'] = user.id
+            session['username'] = username
+            session.permanent = True
+            
+            print(f"Login successful for user: {username}")
+            
+            # 리디렉션 처리
             next_page = request.args.get('next')
-            if next_page:
+            if next_page and next_page.startswith('/'):
                 return redirect(next_page)
             return redirect('/')
         else:
