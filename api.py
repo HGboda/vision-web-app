@@ -1287,6 +1287,7 @@ def serve_index_html():
     heartbeat_script = """
     <script>
     (function(){
+      // 1) 세션 상태 주기 체크 (만료시 로그인으로)
       function checkSession(){
         fetch('/api/status', {credentials: 'include', redirect: 'manual'}).then(function(res){
           var redirected = res.redirected || (res.url && res.url.indexOf('/login') !== -1);
@@ -1298,9 +1299,24 @@ def serve_index_html():
           window.location.href = '/login';
         });
       }
-      // 첫 체크 + 주기적 체크(30초)
       checkSession();
       setInterval(checkSession, 30000);
+
+      // 2) 사용자 비활성(무동작) 2분 후 자동 로그아웃
+      var idleMs = 120000; // 2분
+      var idleTimer;
+      function triggerLogout(){
+        // 서버 세션 정리 후 로그인 화면으로
+        window.location.href = '/logout';
+      }
+      function resetIdle(){
+        if (idleTimer) clearTimeout(idleTimer);
+        idleTimer = setTimeout(triggerLogout, idleMs);
+      }
+      ['click','mousemove','keydown','scroll','touchstart','visibilitychange'].forEach(function(evt){
+        window.addEventListener(evt, resetIdle, {passive:true});
+      });
+      resetIdle();
     })();
     </script>
     """
@@ -1352,6 +1368,7 @@ def serve_react(path):
         heartbeat_script = """
         <script>
         (function(){
+          // 1) 세션 상태 주기 체크 (만료시 로그인으로)
           function checkSession(){
             fetch('/api/status', {credentials: 'include', redirect: 'manual'}).then(function(res){
               var redirected = res.redirected || (res.url && res.url.indexOf('/login') !== -1);
@@ -1364,6 +1381,21 @@ def serve_react(path):
           }
           checkSession();
           setInterval(checkSession, 30000);
+
+          // 2) 사용자 비활성(무동작) 2분 후 자동 로그아웃
+          var idleMs = 120000; // 2분
+          var idleTimer;
+          function triggerLogout(){
+            window.location.href = '/logout';
+          }
+          function resetIdle(){
+            if (idleTimer) clearTimeout(idleTimer);
+            idleTimer = setTimeout(triggerLogout, idleMs);
+          }
+          ['click','mousemove','keydown','scroll','touchstart','visibilitychange'].forEach(function(evt){
+            window.addEventListener(evt, resetIdle, {passive:true});
+          });
+          resetIdle();
         })();
         </script>
         """
