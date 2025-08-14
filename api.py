@@ -33,9 +33,16 @@ from chromadb.utils import embedding_functions
 app = Flask(__name__, static_folder='static')
 app.secret_key = 'your_secret_key_here'  # 세션 암호화를 위한 비밀 키
 app.config['CORS_HEADERS'] = 'Content-Type'
-app.config['REMEMBER_COOKIE_DURATION'] = timedelta(days=30)  # 쿠키 지속 시간
-app.config['REMEMBER_COOKIE_SECURE'] = False  # 개발 환경에서는 False, 프로덕션에서는 True로 설정
+# Remember cookie (Flask-Login)
+app.config['REMEMBER_COOKIE_DURATION'] = timedelta(days=30)
+app.config['REMEMBER_COOKIE_SECURE'] = True  # Spaces uses HTTPS
 app.config['REMEMBER_COOKIE_HTTPONLY'] = True
+app.config['REMEMBER_COOKIE_SAMESITE'] = 'None'
+# Session cookie (Flask-Session)
+app.config['SESSION_COOKIE_SECURE'] = True  # HTTPS
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'None'
+app.config['SESSION_COOKIE_PATH'] = '/'
 CORS(app)  # Enable CORS for all routes
 
 # 시크릿 키 설정 (세션 암호화에 사용)
@@ -1183,7 +1190,7 @@ def login():
                 print(f"Redirecting to: {next_page}")
                 return redirect(next_page)
             print("Redirecting to index.html")
-            return redirect('/index.html')
+            return redirect(url_for('serve_index_html'))
         else:
             error = 'Invalid username or password'
             print(f"Login failed: {error}")
