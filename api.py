@@ -4,6 +4,7 @@ import os
 os.environ['MPLCONFIGDIR'] = '/tmp/matplotlib'
 
 from flask import Flask, request, jsonify, send_from_directory, redirect, url_for, session, render_template_string
+from datetime import timedelta
 import torch
 from PIL import Image
 import numpy as np
@@ -30,6 +31,11 @@ import chromadb
 from chromadb.utils import embedding_functions
 
 app = Flask(__name__, static_folder='static')
+app.secret_key = 'your_secret_key_here'  # 세션 암호화를 위한 비밀 키
+app.config['CORS_HEADERS'] = 'Content-Type'
+app.config['REMEMBER_COOKIE_DURATION'] = timedelta(days=30)  # 쿠키 지속 시간
+app.config['REMEMBER_COOKIE_SECURE'] = False  # 개발 환경에서는 False, 프로덕션에서는 True로 설정
+app.config['REMEMBER_COOKIE_HTTPONLY'] = True
 CORS(app)  # Enable CORS for all routes
 
 # 시크릿 키 설정 (세션 암호화에 사용)
@@ -53,6 +59,7 @@ app.config['SESSION_TYPE'] = 'filesystem'
 app.config['SESSION_PERMANENT'] = True
 app.config['SESSION_USE_SIGNER'] = True
 app.config['SESSION_FILE_DIR'] = session_dir
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)  # 세션 유효 기간 설정
 print(f"Using session directory: {session_dir}")
 Session(app)
 
@@ -1154,10 +1161,11 @@ def login():
         if username in users and users[username].password == password:
             # 로그인 성공 시 세션에 사용자 정보 저장
             user = users[username]
-            login_user(user, remember=True)
+            login_user(user, remember=True, duration=timedelta(days=7))  # remember me 기능 활성화 및 기간 설정
             session['user_id'] = user.id
             session['username'] = username
             session.permanent = True
+            session.modified = True  # 세션 변경 사항 즉시 적용
             
             print(f"Login successful for user: {username}, ID: {user.id}")
             
@@ -1189,7 +1197,13 @@ def serve_static(filename):
 @app.route('/index.html')
 @login_required
 def serve_index_html():
-    print(f"Serving index.html for user: {current_user.username if current_user.is_authenticated else 'not authenticated'}")
+    if not current_user.is_authenticated:
+        print("User not authenticated, redirecting to login")
+        return redirect(url_for('login'))
+    
+    print(f"Serving index.html for authenticated user: {current_user.username}")
+    # 세션 상태 디버그
+    print(f"Session data: user_id={session.get('user_id')}, username={session.get('username')}, is_permanent={session.get('permanent', False)}")
     return send_from_directory(app.static_folder, 'index.html')
 
 # 기본 경로 및 기타 경로 처리 (로그인 필요)
