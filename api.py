@@ -1153,8 +1153,8 @@ def login():
             if next_page and next_page.startswith('/') and next_page != '/login':
                 print(f"Redirecting to: {next_page}")
                 return redirect(next_page)
-            print("Redirecting to root page")
-            return redirect('/')
+            print("Redirecting to static index.html")
+            return send_from_directory(app.static_folder, 'index.html')
         else:
             error = 'Invalid username or password'
             print(f"Login failed: {error}")
@@ -1171,10 +1171,16 @@ def logout():
 @login_required
 def serve_react(path):
     """Serve React frontend"""
-    print(f"Serving React frontend for path: {path}, user: {current_user.username}")
-    if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
+    print(f"Serving React frontend for path: {path}, user: {current_user.username if current_user.is_authenticated else 'not authenticated'}")
+    # Handle static files directly
+    if path.startswith('static/'):
+        file_path = path[7:]  # Remove 'static/' prefix
+        return send_from_directory(app.static_folder, file_path)
+    # Handle other static files in root of static folder
+    elif path != "" and os.path.exists(os.path.join(app.static_folder, path)):
         return send_from_directory(app.static_folder, path)
     else:
+        # Serve the React app's index.html for all other routes
         return send_from_directory(app.static_folder, 'index.html')
 
 @app.route('/similar-images', methods=['GET'])
