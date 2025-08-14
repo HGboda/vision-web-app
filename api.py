@@ -48,7 +48,7 @@ CORS(app)  # Enable CORS for all routes
 # 시크릿 키 설정 (세션 암호화에 사용)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'vision_llm_agent_secret_key')
 app.config['SESSION_TYPE'] = 'filesystem'
-app.config['PERMANENT_SESSION_LIFETIME'] = 3600  # 세션 유효 시간 (초)
+app.config['PERMANENT_SESSION_LIFETIME'] = 120  # 세션 유효 시간 (초)
 
 # Flask-Login 설정
 login_manager = LoginManager()
