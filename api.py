@@ -44,10 +44,16 @@ login_manager.login_view = 'login'
 login_manager.session_protection = 'strong'
 
 # 세션 설정
+import tempfile
 from flask_session import Session
+
+# 임시 디렉토리를 사용하여 권한 문제 해결
+session_dir = tempfile.gettempdir()
 app.config['SESSION_TYPE'] = 'filesystem'
 app.config['SESSION_PERMANENT'] = True
 app.config['SESSION_USE_SIGNER'] = True
+app.config['SESSION_FILE_DIR'] = session_dir
+print(f"Using session directory: {session_dir}")
 Session(app)
 
 # 사용자 클래스 정의
