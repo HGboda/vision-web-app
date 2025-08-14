@@ -83,10 +83,18 @@ users = {
 @login_manager.user_loader
 def load_user(user_id):
     print(f"Loading user with ID: {user_id}")
-    # user_id가 문자열로 전달되기 때문에 사용자 이름으로 처리
+    # 세션 디버그 정보 출력
+    print(f"Session data in user_loader: {dict(session)}")
+    print(f"Current request cookies: {request.cookies}")
+    
+    # user_id가 문자열로 전달되기 때문에 사용자 ID로 처리
     for username, user in users.items():
-        if user.id == user_id:
-            print(f"User found: {username}")
+        if str(user.id) == str(user_id):  # 확실한 문자열 비교
+            print(f"User found: {username}, ID: {user.id}")
+            # 세션 정보 업데이트
+            session['user_id'] = user.id
+            session['username'] = username
+            session.modified = True
             return user
     print(f"User not found with ID: {user_id}")
     return None
@@ -1195,15 +1203,26 @@ def serve_static(filename):
 
 # 인덱스 HTML 직접 서빙 (로그인 필요)
 @app.route('/index.html')
-@login_required
 def serve_index_html():
+    # 세션 및 쿠키 디버그 정보
+    print(f"Request to /index.html - Session data: {dict(session)}")
+    print(f"Request to /index.html - Cookies: {request.cookies}")
+    print(f"Request to /index.html - User authenticated: {current_user.is_authenticated}")
+    
+    # 인증 확인
     if not current_user.is_authenticated:
         print("User not authenticated, redirecting to login")
         return redirect(url_for('login'))
     
-    print(f"Serving index.html for authenticated user: {current_user.username}")
+    print(f"Serving index.html for authenticated user: {current_user.username} (ID: {current_user.id})")
     # 세션 상태 디버그
     print(f"Session data: user_id={session.get('user_id')}, username={session.get('username')}, is_permanent={session.get('permanent', False)}")
+    
+    # 세션 유지를 위해 세션 업데이트
+    session['user_id'] = current_user.id
+    session['username'] = current_user.username
+    session.modified = True
+    
     return send_from_directory(app.static_folder, 'index.html')
 
 # 기본 경로 및 기타 경로 처리 (로그인 필요)
