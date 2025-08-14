@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -28,7 +28,7 @@
     <div class="header">
       <h1>OpenAI Chat</h1>
       <div>
-        <a href="/index.html">홈</a>
+        <a href="/index.html">Home</a>
       </div>
     </div>
 
@@ -39,22 +39,22 @@
           <input id="model" type="text" value="gpt-4o-mini" />
         </div>
         <div>
-          <label for="apiKey">OpenAI API Key (선택)</label>
-          <input id="apiKey" type="password" placeholder="sk-... (환경변수 OPENAI_API_KEY 설정 가능)" />
+          <label for="apiKey">OpenAI API Key (optional)</label>
+          <input id="apiKey" type="password" placeholder="sk-... (OPENAI_API_KEY env var supported)" />
         </div>
       </div>
-      <label for="system">System Prompt (선택)</label>
+      <label for="system">System Prompt (optional)</label>
       <input id="system" type="text" placeholder="You are a helpful assistant." />
-      <label for="prompt">사용자 질문</label>
-      <textarea id="prompt" placeholder="여기에 질문을 입력하세요"></textarea>
+      <label for="prompt">User Question</label>
+      <textarea id="prompt" placeholder="Type your question here"></textarea>
       <div class="actions">
-        <button id="sendBtn">질문 보내기</button>
-        <button class="secondary" id="clearBtn">지우기</button>
+        <button id="sendBtn">Send Question</button>
+        <button class="secondary" id="clearBtn">Clear</button>
       </div>
     </div>
 
     <div class="card">
-      <div class="muted">응답</div>
+      <div class="muted">Response</div>
       <div id="response" class="log"></div>
     </div>
   </div>
@@ -65,7 +65,7 @@
 
     function setLoading(on) {
       $('sendBtn').disabled = on;
-      $('sendBtn').textContent = on ? '전송 중...' : '질문 보내기';
+      $('sendBtn').textContent = on ? 'Sending...' : 'Send Question';
     }
 
     $('clearBtn').addEventListener('click', () => {
@@ -80,7 +80,7 @@
       const system = $('system').value.trim();
 
       if (!prompt) {
-        alert('질문을 입력하세요.');
+        alert('Please enter a question.');
         return;
       }
 
@@ -104,9 +104,9 @@
         const data = await res.json();
         const { response, model: usedModel, usage, latency_sec } = data;
         const meta = `Model: ${usedModel} | Latency: ${latency_sec}s` + (usage ? ` | Usage: ${JSON.stringify(usage)}` : '');
-        responseEl.textContent = response ? (response + '\n\n---\n' + meta) : '(빈 응답)\n' + meta;
+        responseEl.textContent = response ? (response + '\n\n---\n' + meta) : '(Empty response)\n' + meta;
       } catch (e) {
-        responseEl.textContent = '에러: ' + e.message;
+        responseEl.textContent = 'Error: ' + e.message;
       } finally {
         setLoading(false);
       }
