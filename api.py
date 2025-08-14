@@ -3,7 +3,7 @@
 import os
 os.environ['MPLCONFIGDIR'] = '/tmp/matplotlib'
 
-from flask import Flask, request, jsonify, send_from_directory, redirect, url_for, session, render_template_string
+from flask import Flask, request, jsonify, send_from_directory, redirect, url_for, session, render_template_string, make_response
 from datetime import timedelta
 import torch
 from PIL import Image
@@ -18,7 +18,16 @@ import time
 from flask_cors import CORS
 import json
 import sys
-from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from flask_login import (
+    LoginManager,
+    UserMixin,
+    login_user,
+    logout_user,
+    login_required,
+    current_user,
+    fresh_login_required,
+    login_fresh,
+)
 
 # Fix for SQLite3 version compatibility with ChromaDB
 try:
@@ -33,8 +42,8 @@ from chromadb.utils import embedding_functions
 app = Flask(__name__, static_folder='static')
 app.secret_key = 'your_secret_key_here'  # 세션 암호화를 위한 비밀 키
 app.config['CORS_HEADERS'] = 'Content-Type'
-# Remember cookie (Flask-Login)
-app.config['REMEMBER_COOKIE_DURATION'] = timedelta(days=30)
+# Remember cookie (Flask-Login) — minimize duration to prevent auto re-login
+app.config['REMEMBER_COOKIE_DURATION'] = timedelta(seconds=1)
 app.config['REMEMBER_COOKIE_SECURE'] = True  # Spaces uses HTTPS
 app.config['REMEMBER_COOKIE_HTTPONLY'] = True
 app.config['REMEMBER_COOKIE_SAMESITE'] = 'None'
@@ -1208,7 +1217,19 @@ def logout():
         session.clear()
     except Exception as e:
         print(f"[DEBUG] Error clearing session on logout: {e}")
-    return redirect(url_for('login'))
+    # Ensure remember cookie is removed by setting an expired cookie
+    resp = redirect(url_for('login'))
+    try:
+        resp.delete_cookie(
+            key='remember_token',
+            path='/',
+            samesite='None',
+            secure=True,
+            httponly=True,
+        )
+    except Exception as e:
+        print(f"[DEBUG] Error deleting remember_token cookie: {e}")
+    return resp
 
 # 정적 파일 서빙을 위한 라우트 (로그인 불필요)
 @app.route('/static/<path:filename>')
@@ -1224,8 +1245,8 @@ def serve_index_html():
     print(f"Request to /index.html - Cookies: {request.cookies}")
     print(f"Request to /index.html - User authenticated: {current_user.is_authenticated}")
     
-    # 인증 확인
-    if not current_user.is_authenticated:
+    # 인증 확인 (fresh session only)
+    if not current_user.is_authenticated or not login_fresh():
         print("User not authenticated, redirecting to login")
         return redirect(url_for('login'))
     
@@ -1238,7 +1259,45 @@ def serve_index_html():
     session['username'] = current_user.username
     session.modified = True
     
-    resp = send_from_directory(app.static_folder, 'index.html')
+    # index.html을 읽어 하트비트 스크립트를 주입
+    index_path = os.path.join(app.static_folder, 'index.html')
+    try:
+        with open(index_path, 'r', encoding='utf-8') as f:
+            html = f.read()
+    except Exception as e:
+        print(f"[DEBUG] Failed to read index.html for injection: {e}")
+        return send_from_directory(app.static_folder, 'index.html')
+
+    heartbeat_script = """
+    <script>
+    (function(){
+      function checkSession(){
+        fetch('/api/status', {credentials: 'include'}).then(function(res){
+          if(res.status !== 200){
+            window.location.href = '/login';
+          }
+        }).catch(function(){
+          // 네트워크 오류 등도 로그인으로 유도
+          window.location.href = '/login';
+        });
+      }
+      // 첫 체크 + 주기적 체크(30초)
+      checkSession();
+      setInterval(checkSession, 30000);
+    })();
+    </script>
+    """
+
+    try:
+        if '</body>' in html:
+            html = html.replace('</body>', heartbeat_script + '</body>')
+        else:
+            html = html + heartbeat_script
+    except Exception as e:
+        print(f"[DEBUG] Failed to inject heartbeat script: {e}")
+        return send_from_directory(app.static_folder, 'index.html')
+
+    resp = make_response(html)
     # Prevent sensitive pages from being cached
     resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     resp.headers['Pragma'] = 'no-cache'
@@ -1248,7 +1307,7 @@ def serve_index_html():
 # 기본 경로 및 기타 경로 처리 (로그인 필요)
 @app.route('/', defaults={'path': ''}, methods=['GET'])
 @app.route('/<path:path>', methods=['GET'])
-@login_required
+@fresh_login_required
 def serve_react(path):
     """Serve React frontend"""
     print(f"Serving React frontend for path: {path}, user: {current_user.username if current_user.is_authenticated else 'not authenticated'}")
@@ -1260,15 +1319,58 @@ def serve_react(path):
         resp.headers['Expires'] = '0'
         return resp
     else:
-        # React 앱의 index.html 서빙
-        resp = send_from_directory(app.static_folder, 'index.html')
+        # React 앱의 index.html 서빙 (하트비트 스크립트 주입)
+        index_path = os.path.join(app.static_folder, 'index.html')
+        try:
+            with open(index_path, 'r', encoding='utf-8') as f:
+                html = f.read()
+        except Exception as e:
+            print(f"[DEBUG] Failed to read index.html for injection (serve_react): {e}")
+            resp = send_from_directory(app.static_folder, 'index.html')
+            resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+            resp.headers['Pragma'] = 'no-cache'
+            resp.headers['Expires'] = '0'
+            return resp
+
+        heartbeat_script = """
+        <script>
+        (function(){
+          function checkSession(){
+            fetch('/api/status', {credentials: 'include'}).then(function(res){
+              if(res.status !== 200){
+                window.location.href = '/login';
+              }
+            }).catch(function(){
+              window.location.href = '/login';
+            });
+          }
+          checkSession();
+          setInterval(checkSession, 30000);
+        })();
+        </script>
+        """
+
+        try:
+            if '</body>' in html:
+                html = html.replace('</body>', heartbeat_script + '</body>')
+            else:
+                html = html + heartbeat_script
+        except Exception as e:
+            print(f"[DEBUG] Failed to inject heartbeat script (serve_react): {e}")
+            resp = send_from_directory(app.static_folder, 'index.html')
+            resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+            resp.headers['Pragma'] = 'no-cache'
+            resp.headers['Expires'] = '0'
+            return resp
+
+        resp = make_response(html)
         resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
         resp.headers['Pragma'] = 'no-cache'
         resp.headers['Expires'] = '0'
         return resp
 
 @app.route('/similar-images', methods=['GET'])
-@login_required
+@fresh_login_required
 def similar_images_page():
     """Serve similar images search page"""
     resp = send_from_directory(app.static_folder, 'similar-images.html')
@@ -1278,7 +1380,7 @@ def similar_images_page():
     return resp
 
 @app.route('/object-detection-search', methods=['GET'])
-@login_required
+@fresh_login_required
 def object_detection_search_page():
     """Serve object detection search page"""
     resp = send_from_directory(app.static_folder, 'object-detection-search.html')
@@ -1288,7 +1390,7 @@ def object_detection_search_page():
     return resp
 
 @app.route('/model-vector-db', methods=['GET'])
-@login_required
+@fresh_login_required
 def model_vector_db_page():
     """Serve model vector DB UI page"""
     resp = send_from_directory(app.static_folder, 'model-vector-db.html')
@@ -1298,7 +1400,7 @@ def model_vector_db_page():
     return resp
 
 @app.route('/api/status', methods=['GET'])
-@login_required
+@fresh_login_required
 def status():
     return jsonify({
         "status": "online",
