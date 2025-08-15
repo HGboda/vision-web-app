@@ -56,12 +56,16 @@ const useStyles = makeStyles((theme) => ({
   imageContainer: {
     position: 'relative',
     width: '100%',
-    height: '100%',
+    // Use a fixed, responsive height so the preview image scales correctly
+    height: 420,
+    [theme.breakpoints.down('sm')]: {
+      height: 320,
+    },
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
-    marginTop: theme.spacing(2)
+    marginTop: theme.spacing(2),
   },
   deleteButton: {
     position: 'absolute',

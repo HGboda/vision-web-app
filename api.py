@@ -1544,9 +1544,7 @@ def openai_chat_api():
         start = time.time()
         client = OpenAI(api_key=api_key)
 
-        print("Available models (first 5):", [m.id for m in client.models.list().data][:5])
-
-
+        # Perform chat completion
         chat = client.chat.completions.create(
             model=model,
             messages=[
@@ -1556,7 +1554,19 @@ def openai_chat_api():
         )
         latency = round(time.time() - start, 3)
     except Exception as e:
-        return jsonify({"error": f"OpenAI SDK call failed: {str(e)}"}), 502
+        # Log detailed error for diagnostics
+        try:
+            import traceback
+            traceback.print_exc()
+        except Exception:
+            pass
+        err_msg = str(e)
+        print(f"[OpenAI Chat Error] model={model} err={err_msg}")
+        return jsonify({
+            "error": "OpenAI SDK call failed",
+            "detail": err_msg,
+            "model": model
+        }), 502
 
     try:
         content = chat.choices[0].message.content if chat and chat.choices else ''
