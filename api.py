@@ -1349,14 +1349,48 @@ def serve_index_html():
 @app.route('/static/<path:filename>')
 def static_files(filename):
     print(f"Serving static file: {filename}")
-    return send_from_directory(app.static_folder, filename)
+    # Two possible locations after CRA build copy:
+    # 1) Top-level:    static/<filename>
+    # 2) Nested build: static/static/<filename>
+    top_level_path = os.path.join(app.static_folder, filename)
+    nested_dir = os.path.join(app.static_folder, 'static')
+    nested_path = os.path.join(nested_dir, filename)
+
+    try:
+        if os.path.exists(top_level_path):
+            return send_from_directory(app.static_folder, filename)
+        elif os.path.exists(nested_path):
+            # Serve from nested build directory
+            return send_from_directory(nested_dir, filename)
+        else:
+            # Fallback: try as-is (may help in some edge cases)
+            return send_from_directory(app.static_folder, filename)
+    except Exception as e:
+        print(f"[DEBUG] Error serving static file '{filename}': {e}")
+        # Final fallback to avoid leaking stack traces
+        return ('Not Found', 404)
 
 # Add explicit handlers for JS files that are failing
 @app.route('/static/js/<path:filename>')
 def static_js_files(filename):
     print(f"Serving JS file: {filename}")
-    js_path = os.path.join('js', filename)
-    return send_from_directory(app.static_folder, js_path)
+    # Try top-level static/js and nested static/static/js
+    top_js_dir = os.path.join(app.static_folder, 'js')
+    nested_js_dir = os.path.join(app.static_folder, 'static', 'js')
+    top_js_path = os.path.join(top_js_dir, filename)
+    nested_js_path = os.path.join(nested_js_dir, filename)
+
+    try:
+        if os.path.exists(top_js_path):
+            return send_from_directory(top_js_dir, filename)
+        elif os.path.exists(nested_js_path):
+            return send_from_directory(nested_js_dir, filename)
+        else:
+            # As a fallback, let the generic static handler try
+            return static_files(os.path.join('js', filename))
+    except Exception as e:
+        print(f"[DEBUG] Error serving JS file '{filename}': {e}")
+        return ('Not Found', 404)
 
 # 기본 경로 및 기타 경로 처리 (로그인 필요)
 @app.route('/', defaults={'path': ''}, methods=['GET'])
