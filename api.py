@@ -1493,7 +1493,7 @@ def openai_chat_api():
         return jsonify({"error": "Invalid JSON body"}), 400
 
     prompt = (data or {}).get('prompt', '').strip()
-    model = (data or {}).get('model') or os.environ.get('OPENAI_MODEL', 'gpt-4o-mini')
+    model = (data or {}).get('model') or os.environ.get('OPENAI_MODEL', 'gpt-4')
     system = (data or {}).get('system') or 'You are a helpful assistant.'
     api_key = (data or {}).get('api_key') or os.environ.get('OPENAI_API_KEY')
 

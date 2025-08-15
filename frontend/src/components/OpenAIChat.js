@@ -9,7 +9,7 @@ import {
 } from '@material-ui/core';
 
 function OpenAIChat() {
-  const [model, setModel] = useState('gpt-4o-mini');
+  const [model, setModel] = useState('gpt-4');
   const [apiKey, setApiKey] = useState('');
   const [system, setSystem] = useState('You are a helpful assistant.');
   const [prompt, setPrompt] = useState('');
@@ -31,7 +31,7 @@ function OpenAIChat() {
         credentials: 'include',
         body: JSON.stringify({
           prompt: p,
-          model: (model || '').trim() || 'gpt-4o-mini',
+          model: (model || '').trim() || 'gpt-4',
           api_key: (apiKey || undefined),
           system: (system || undefined)
         })
