@@ -56,10 +56,10 @@ const useStyles = makeStyles((theme) => ({
   imageContainer: {
     position: 'relative',
     width: '100%',
-    // Use a fixed, responsive height so the preview image scales correctly
-    height: 420,
+    // Use viewport-based height so any aspect ratio fits inside
+    height: '60vh',
     [theme.breakpoints.down('sm')]: {
-      height: 320,
+      height: '45vh',
     },
     display: 'flex',
     justifyContent: 'center',
