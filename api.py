@@ -1509,6 +1509,10 @@ def openai_chat_api():
     try:
         start = time.time()
         client = OpenAI(api_key=api_key)
+
+        print("Available models (first 5):", [m.id for m in client.models.list().data][:5])
+
+
         chat = client.chat.completions.create(
             model=model,
             messages=[
