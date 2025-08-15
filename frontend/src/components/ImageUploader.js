@@ -179,6 +179,13 @@ const ImageUploader = ({ onImageUpload }) => {
               src={previewUrl}
               alt="Preview"
               className="preview-image"
+              style={{
+                width: '100%',
+                height: 'auto',
+                maxHeight: '100%',
+                objectFit: 'contain',
+                display: 'block'
+              }}
             />
             <IconButton
               aria-label="delete"
