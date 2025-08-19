@@ -23,6 +23,15 @@ try:
     from openai import OpenAI
 except Exception as _e:
     OpenAI = None
+try:
+    # LangChain for RAG answering
+    from langchain_openai import ChatOpenAI
+    from langchain_core.prompts import ChatPromptTemplate
+    from langchain_core.output_parsers import StrOutputParser
+except Exception as _e:
+    ChatOpenAI = None
+    ChatPromptTemplate = None
+    StrOutputParser = None
 from flask_login import (
     LoginManager,
     UserMixin,
@@ -1580,6 +1589,128 @@ def openai_chat_api():
         'model': model,
         'usage': usage,
         'latency_sec': latency
+    })
+
+@app.route('/api/vision-rag/query', methods=['POST'])
+@login_required
+def vision_rag_query():
+    """Vision RAG endpoint.
+    Expects JSON with one of the following query modes and a user question:
+      - { userQuery, searchType: 'image', image, n_results? }
+      - { userQuery, searchType: 'object', objectId, n_results? }
+      - { userQuery, searchType: 'class', class_name, n_results? }
+    Returns: { answer, retrieved: [...], model, latency_sec }
+    """
+    if ChatOpenAI is None:
+        return jsonify({"error": "LangChain not installed on server"}), 500
+
+    data = request.get_json(silent=True) or {}
+    user_query = (data.get('userQuery') or '').strip()
+    if not user_query:
+        return jsonify({"error": "Missing 'userQuery'"}), 400
+
+    api_key = data.get('api_key') or os.environ.get('OPENAI_API_KEY')
+    if not api_key:
+        return jsonify({"error": "Missing OpenAI API key. Provide in request or set OPENAI_API_KEY env."}), 400
+
+    search_type = data.get('searchType', 'image')
+    n_results = int(data.get('n_results', 5))
+
+    # Build query embedding or filtered fetch similar to /api/search-similar-objects
+    results = None
+    try:
+        if search_type == 'image' and 'image' in data:
+            image_data = data['image']
+            if isinstance(image_data, str) and image_data.startswith('data:image'):
+                image_data = image_data.split(',')[1]
+            image = Image.open(BytesIO(base64.b64decode(image_data))).convert('RGB')
+            query_embedding = generate_image_embedding(image)
+            if query_embedding is None:
+                return jsonify({"error": "Failed to generate image embedding"}), 500
+            results = object_collection.query(
+                query_embeddings=[query_embedding],
+                n_results=n_results,
+                include=["metadatas", "distances"]
+            ) if object_collection is not None else None
+        elif search_type == 'object' and 'objectId' in data:
+            obj_id = data['objectId']
+            base = object_collection.get(ids=[obj_id], include=["embeddings"]) if object_collection is not None else None
+            emb = base["embeddings"][0] if base and "embeddings" in base and base["embeddings"] else None
+            if emb is None:
+                return jsonify({"error": "objectId not found or has no embedding"}), 400
+            results = object_collection.query(
+                query_embeddings=[emb],
+                n_results=n_results,
+                include=["metadatas", "distances"]
+            )
+        elif search_type == 'class' and 'class_name' in data:
+            filter_query = {"class": {"$eq": data['class_name']}}
+            results = object_collection.get(
+                where=filter_query,
+                limit=n_results,
+                include=["metadatas", "embeddings", "documents"]
+            ) if object_collection is not None else None
+        else:
+            return jsonify({"error": "Invalid search parameters"}), 400
+    except Exception as e:
+        return jsonify({"error": f"Retrieval failed: {str(e)}"}), 500
+
+    # Format results using existing helper
+    formatted = format_object_results(results) if results else []
+
+    # Build concise context for LLM
+    def _shorten(md):
+        try:
+            bbox = md.get('bbox') if isinstance(md, dict) else None
+            if isinstance(bbox, dict):
+                bbox = {k: round(float(v), 3) for k, v in bbox.items() if isinstance(v, (int, float))}
+            return {
+                'image_id': md.get('image_id'),
+                'class': md.get('class'),
+                'confidence': md.get('confidence'),
+                'bbox': bbox,
+            }
+        except Exception:
+            return {k: md.get(k) for k in ('image_id', 'class', 'confidence') if k in md}
+
+    context_items = []
+    for r in formatted[:n_results]:
+        md = r.get('metadata', {})
+        item = {
+            'id': r.get('id'),
+            'distance': r.get('distance'),
+            'meta': _shorten(md)
+        }
+        context_items.append(item)
+
+    # Compose prompt
+    system_text = (
+        "You are a vision assistant. Use ONLY the provided detected object context to answer. "
+        "Be concise and state uncertainty if context is insufficient."
+    )
+    # Provide the minimal JSON-like context to the model
+    context_text = json.dumps(context_items, ensure_ascii=False, indent=2)
+    user_text = f"User question: {user_query}\n\nDetected context (top {len(context_items)}):\n{context_text}"
+
+    try:
+        start = time.time()
+        llm = ChatOpenAI(api_key=api_key, model=os.environ.get('OPENAI_MODEL', 'gpt-4o'))
+        # Keep it simple: template -> LLM -> string
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", system_text),
+            ("human", "{input}")
+        ])
+        chain = prompt | llm | StrOutputParser()
+        answer = chain.invoke({"input": user_text})
+        latency = round(time.time() - start, 3)
+    except Exception as e:
+        return jsonify({"error": f"LLM call failed: {str(e)}"}), 502
+
+    return jsonify({
+        "answer": answer,
+        "retrieved": context_items,
+        "model": getattr(llm, 'model', None),
+        "latency_sec": latency
     })
 
 @app.route('/api/status', methods=['GET'])
