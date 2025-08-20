@@ -31,7 +31,7 @@ function OpenAIChat({ imageBase64 }) {
     setError('');
     setResponse('');
     const q = (prompt || '').trim();
-    if (!q) { setError('질문을 입력하세요.'); return; }
+    if (!q) { setError('Please enter a question.'); return; }
 
     // Build request body for /api/vision-rag/query
     const body = {
@@ -41,13 +41,13 @@ function OpenAIChat({ imageBase64 }) {
     };
     if (apiKey) body.api_key = apiKey;
     if (searchType === 'image') {
-      if (!imageBase64) { setError('이미지가 필요합니다. 먼저 이미지를 업로드하세요.'); return; }
+      if (!imageBase64) { setError('Image is required. Please upload an image first.'); return; }
       body.image = imageBase64;
     } else if (searchType === 'object') {
-      if (!objectId.trim()) { setError('objectId를 입력하세요.'); return; }
+      if (!objectId.trim()) { setError('Please enter an objectId.'); return; }
       body.objectId = objectId.trim();
     } else if (searchType === 'class') {
-      if (!className.trim()) { setError('class_name을 입력하세요.'); return; }
+      if (!className.trim()) { setError('Please enter a class_name.'); return; }
       body.class_name = className.trim();
     }
 
@@ -68,21 +68,21 @@ function OpenAIChat({ imageBase64 }) {
       const data = await res.json();
       const meta = `Model: ${data.model || '-'} | Latency: ${data.latency_sec || '-'}s`;
       
-      // 검색 결과 포맷팅
+      // Format search results
       let retrievedText = '';
       if (data.retrieved && data.retrieved.length > 0) {
-        retrievedText = '\n\n검색 결과:\n';
+        retrievedText = '\n\nSearch Results:\n';
         data.retrieved.forEach((item, index) => {
           retrievedText += `${index + 1}. ID: ${item.id || '-'}\n`;
           if (item.meta) {
-            retrievedText += `   클래스: ${item.meta.class || '-'}\n`;
-            retrievedText += `   신뢰도: ${item.meta.confidence || '-'}\n`;
+            retrievedText += `   Class: ${item.meta.class || '-'}\n`;
+            retrievedText += `   Confidence: ${item.meta.confidence || '-'}\n`;
           }
-          retrievedText += `   유사도: ${item.distance ? item.distance.toFixed(4) : '-'}\n`;
+          retrievedText += `   Similarity: ${item.distance ? item.distance.toFixed(4) : '-'}\n`;
         });
       }
       
-      setResponse((data.answer || '(빈 응답)') + retrievedText + '\n\n---\n' + meta);
+      setResponse((data.answer || '(No response)') + retrievedText + '\n\n---\n' + meta);
     } catch (e) {
       setError('Error: ' + e.message);
     } finally {
@@ -102,7 +102,7 @@ function OpenAIChat({ imageBase64 }) {
         Vision RAG (LangChain)
       </Typography>
       <Typography variant="body2" color="textSecondary" gutterBottom>
-        서버에 OPENAI_API_KEY가 설정되어 있다면 API Key는 생략 가능합니다. 검색 유형을 선택하고 질문을 보내면, 벡터 DB에서 검색된 컨텍스트로 답변합니다.
+        If OPENAI_API_KEY is set on the server, API Key is optional. Select a search type and send a question to get answers based on context retrieved from the vector DB.
       </Typography>
       <Grid container spacing={2}>
         <Grid item xs={12} md={6}>
@@ -180,7 +180,7 @@ function OpenAIChat({ imageBase64 }) {
             multiline
             rows={4}
             variant="outlined"
-            placeholder={searchType === 'image' ? '업로드한 이미지 기반으로 답변해줘' : '검색된 객체 컨텍스트를 사용해 답변해줘'}
+            placeholder={searchType === 'image' ? 'Answer based on the uploaded image' : 'Answer using the retrieved object context'}
           />
         </Grid>
         {error && (
