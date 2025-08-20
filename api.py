@@ -1605,6 +1605,17 @@ def vision_rag_query():
         return jsonify({"error": "LangChain not installed on server"}), 500
 
     data = request.get_json(silent=True) or {}
+    # Debug: log incoming payload keys and basic info (without sensitive data)
+    try:
+        print("[VRAG][REQ] keys=", list(data.keys()))
+        print("[VRAG][REQ] has_api_key=", bool(data.get('api_key') or os.environ.get('OPENAI_API_KEY')))
+        _img = data.get('image')
+        if isinstance(_img, str):
+            print("[VRAG][REQ] image_str_len=", len(_img), "prefix=", _img[:30] if len(_img) > 30 else _img)
+        print("[VRAG][REQ] searchType=", data.get('searchType'), "objectId=", data.get('objectId'), "class_name=", data.get('class_name'))
+    except Exception as _e:
+        print("[VRAG][WARN] failed to log request payload:", _e)
+
     user_query = (data.get('userQuery') or '').strip()
     if not user_query:
         return jsonify({"error": "Missing 'userQuery'"}), 400
@@ -1615,6 +1626,7 @@ def vision_rag_query():
 
     search_type = data.get('searchType', 'image')
     n_results = int(data.get('n_results', 5))
+    print(f"[VRAG] user_query='{user_query}' | search_type={search_type} | n_results={n_results}")
 
     # Build query embedding or filtered fetch similar to /api/search-similar-objects
     results = None
@@ -1657,6 +1669,18 @@ def vision_rag_query():
 
     # Format results using existing helper
     formatted = format_object_results(results) if results else []
+    # Debug: log retrieval summary
+    try:
+        cnt = len(formatted)
+        print(f"[VRAG][RETRIEVE] items={cnt}")
+        if cnt:
+            print("[VRAG][RETRIEVE] first_item=", {
+                'id': formatted[0].get('id'),
+                'distance': formatted[0].get('distance'),
+                'meta_keys': list((formatted[0].get('metadata') or {}).keys())
+            })
+    except Exception as _e:
+        print("[VRAG][WARN] failed to log retrieval summary:", _e)
 
     # Build concise context for LLM
     def _shorten(md):
@@ -1691,6 +1715,14 @@ def vision_rag_query():
     # Provide the minimal JSON-like context to the model
     context_text = json.dumps(context_items, ensure_ascii=False, indent=2)
     user_text = f"User question: {user_query}\n\nDetected context (top {len(context_items)}):\n{context_text}"
+
+    # Debug: show compact context preview
+    try:
+        print("[VRAG][CTX] context_items_count=", len(context_items))
+        if context_items:
+            print("[VRAG][CTX] sample=", json.dumps(context_items[0], ensure_ascii=False))
+    except Exception as _e:
+        print("[VRAG][WARN] failed to log context:", _e)
 
     try:
         start = time.time()
