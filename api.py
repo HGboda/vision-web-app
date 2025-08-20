@@ -1724,16 +1724,51 @@ def vision_rag_query():
     except Exception as _e:
         print("[VRAG][WARN] failed to log context:", _e)
 
+    # Attempt multimodal call (text + top-1 image) if available; otherwise fallback to text-only LangChain.
+    answer = None
+    model_used = None
     try:
         start = time.time()
-        llm = ChatOpenAI(api_key=api_key, model=os.environ.get('OPENAI_MODEL', 'gpt-4o'))
-        # Keep it simple: template -> LLM -> string
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", system_text),
-            ("human", "{input}")
-        ])
-        chain = prompt | llm | StrOutputParser()
-        answer = chain.invoke({"input": user_text})
+        top_data_url = None
+        try:
+            if formatted:
+                md0 = (formatted[0] or {}).get('metadata') or {}
+                img_b64 = md0.get('image_data')
+                if isinstance(img_b64, str) and len(img_b64) > 50:
+                    # Construct data URL without logging raw base64
+                    top_data_url = 'data:image/jpeg;base64,' + img_b64
+        except Exception:
+            top_data_url = None
+
+        # Prefer OpenAI SDK for multimodal if available and we have an image
+        if OpenAI is not None and top_data_url is not None:
+            client = OpenAI(api_key=api_key)
+            model_used = os.environ.get('OPENAI_MODEL', 'gpt-4o')
+            chat = client.chat.completions.create(
+                model=model_used,
+                messages=[
+                    {"role": "system", "content": system_text},
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": user_text},
+                            {"type": "image_url", "image_url": {"url": top_data_url}},
+                        ],
+                    },
+                ],
+            )
+            answer = chat.choices[0].message.content if chat and chat.choices else ''
+        else:
+            # Fallback to existing LangChain text-only flow
+            llm = ChatOpenAI(api_key=api_key, model=os.environ.get('OPENAI_MODEL', 'gpt-4o'))
+            prompt = ChatPromptTemplate.from_messages([
+                ("system", system_text),
+                ("human", "{input}")
+            ])
+            chain = prompt | llm | StrOutputParser()
+            answer = chain.invoke({"input": user_text})
+            model_used = getattr(llm, 'model', None)
+
         latency = round(time.time() - start, 3)
     except Exception as e:
         return jsonify({"error": f"LLM call failed: {str(e)}"}), 502
@@ -1741,7 +1776,7 @@ def vision_rag_query():
     return jsonify({
         "answer": answer,
         "retrieved": context_items,
-        "model": getattr(llm, 'model', None),
+        "model": model_used,
         "latency_sec": latency
     })
 
