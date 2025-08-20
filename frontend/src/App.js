@@ -35,6 +35,7 @@ const theme = createMuiTheme({
 
 function App() {
   const [selectedImage, setSelectedImage] = useState(null);
+  const [imageBase64, setImageBase64] = useState('');
   const [selectedModel, setSelectedModel] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [results, setResults] = useState(null);
@@ -62,6 +63,19 @@ function App() {
     setSelectedImage(image);
     setResults(null);
     setError(null);
+
+    // Convert uploaded File -> base64 data URL for Vision RAG image search
+    if (image instanceof File) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result; // e.g., data:image/png;base64,....
+        setImageBase64(typeof dataUrl === 'string' ? dataUrl : '');
+      };
+      reader.onerror = () => setImageBase64('');
+      reader.readAsDataURL(image);
+    } else {
+      setImageBase64('');
+    }
   };
 
   const handleModelSelect = (model) => {
@@ -193,9 +207,9 @@ function App() {
               </>
             )}
 
-            {/* OpenAI Chat section at the end */}
+            {/* Vision RAG (LangChain) section at the end */}
             <Grid item xs={12}>
-              <OpenAIChat />
+              <OpenAIChat imageBase64={imageBase64} />
             </Grid>
           </Grid>
         </Container>
