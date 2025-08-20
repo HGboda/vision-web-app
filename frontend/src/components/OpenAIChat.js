@@ -67,7 +67,22 @@ function OpenAIChat({ imageBase64 }) {
       }
       const data = await res.json();
       const meta = `Model: ${data.model || '-'} | Latency: ${data.latency_sec || '-'}s`;
-      setResponse((data.answer || '(빈 응답)') + '\n\n---\n' + meta);
+      
+      // 검색 결과 포맷팅
+      let retrievedText = '';
+      if (data.retrieved && data.retrieved.length > 0) {
+        retrievedText = '\n\n검색 결과:\n';
+        data.retrieved.forEach((item, index) => {
+          retrievedText += `${index + 1}. ID: ${item.id || '-'}\n`;
+          if (item.meta) {
+            retrievedText += `   클래스: ${item.meta.class || '-'}\n`;
+            retrievedText += `   신뢰도: ${item.meta.confidence || '-'}\n`;
+          }
+          retrievedText += `   유사도: ${item.distance ? item.distance.toFixed(4) : '-'}\n`;
+        });
+      }
+      
+      setResponse((data.answer || '(빈 응답)') + retrievedText + '\n\n---\n' + meta);
     } catch (e) {
       setError('Error: ' + e.message);
     } finally {
