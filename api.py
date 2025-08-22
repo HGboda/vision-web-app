@@ -1209,11 +1209,11 @@ LOGIN_TEMPLATE = '''
             <input type="password" name="fakepasswordremembered" style="display:none" tabindex="-1" autocomplete="off">
             <div class="form-group">
                 <label for="username">Username</label>
-                <input type="text" id="username" name="username" required autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false">
+                <input type="text" id="username" name="username" value="user" required autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false">
             </div>
             <div class="form-group">
                 <label for="password">Password</label>
-                <input type="password" id="password" name="password" required autocomplete="current-password" autocapitalize="none" autocorrect="off" spellcheck="false">
+                <input type="password" id="password" name="password" value="user123" placeholder="******" required autocomplete="current-password" autocapitalize="none" autocorrect="off" spellcheck="false">
             </div>
             <button type="submit">Login</button>
             {% if error %}
