@@ -54,7 +54,14 @@ import chromadb
 from chromadb.utils import embedding_functions
 
 app = Flask(__name__, static_folder='static')
-app.secret_key = 'your_secret_key_here'  # 세션 암호화를 위한 비밀 키
+# 환경 변수에서 비밀 키를 가져오거나, 없으면 안전한 랜덤 키 생성
+secret_key = os.environ.get('FLASK_SECRET_KEY')
+if not secret_key:
+    import secrets
+    secret_key = secrets.token_hex(16)  # 32자 길이의 랜덤 16진수 문자열 생성
+    print("WARNING: FLASK_SECRET_KEY 환경 변수가 설정되지 않았습니다. 랜덤 키를 생성했습니다.")
+    print("서버 재시작 시 세션이 모두 만료됩니다. 프로덕션 환경에서는 환경 변수를 설정하세요.")
+app.secret_key = secret_key  # 세션 암호화를 위한 비밀 키
 app.config['CORS_HEADERS'] = 'Content-Type'
 # Remember cookie (Flask-Login) — minimize duration to prevent auto re-login
 app.config['REMEMBER_COOKIE_DURATION'] = timedelta(seconds=1)
@@ -117,9 +124,29 @@ class User(UserMixin):
         return str(self.id)  # Flask-Login은 문자열 ID를 요구함
 
 # 테스트용 사용자 (실제 환경에서는 데이터베이스 사용 권장)
+# 환경 변수에서 사용자 계정 정보를 가져오기 (기본값 없음)
+admin_username = os.environ.get('ADMIN_USERNAME', 'admin')
+admin_password = os.environ.get('ADMIN_PASSWORD')
+user_username = os.environ.get('USER_USERNAME', 'user')
+user_password = os.environ.get('USER_PASSWORD')
+
+# 환경 변수가 설정되지 않았을 경우 경고 메시지 출력
+if not admin_password or not user_password:
+    print("ERROR: 환경 변수 ADMIN_PASSWORD 또는 USER_PASSWORD가 설정되지 않았습니다.")
+    print("Hugging Face Spaces에서 반드시 환경 변수를 설정해야 합니다.")
+    print("Settings > Repository secrets에서 환경 변수를 추가하세요.")
+    # 환경 변수가 없을 경우 임시 비밀번호 생성 (개발용)
+    import secrets
+    if not admin_password:
+        admin_password = secrets.token_hex(8)  # 임시 비밀번호 생성
+        print(f"WARNING: 임시 admin 비밀번호가 생성되었습니다: {admin_password}")
+    if not user_password:
+        user_password = secrets.token_hex(8)  # 임시 비밀번호 생성
+        print(f"WARNING: 임시 user 비밀번호가 생성되었습니다: {user_password}")
+
 users = {
-    'admin': User('1', 'admin', 'admin123'),
-    'user': User('2', 'user', 'user123')
+    admin_username: User('1', admin_username, admin_password),
+    user_username: User('2', user_username, user_password)
 }
 
 # 사용자 로더 함수
