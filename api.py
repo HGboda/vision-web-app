@@ -75,15 +75,15 @@ app.secret_key = secret_key  # 세션 암호화를 위한 비밀 키
 app.config['CORS_HEADERS'] = 'Content-Type'
 # Remember cookie (Flask-Login) — minimize duration to prevent auto re-login
 app.config['REMEMBER_COOKIE_DURATION'] = timedelta(seconds=1)
-app.config['REMEMBER_COOKIE_SECURE'] = False  # Allow HTTP for local dev
+app.config['REMEMBER_COOKIE_SECURE'] = True  # HTTPS required for HF Spaces
 app.config['REMEMBER_COOKIE_HTTPONLY'] = True
-app.config['REMEMBER_COOKIE_SAMESITE'] = 'Lax'
-# Session cookie (Flask-Session) - relaxed for local dev
-app.config['SESSION_COOKIE_SECURE'] = False  # Allow HTTP for local dev
+app.config['REMEMBER_COOKIE_SAMESITE'] = 'None'
+# Session cookie (Flask-Session) - configured for Hugging Face Spaces
+app.config['SESSION_COOKIE_SECURE'] = True  # HTTPS required for HF Spaces
 app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # More permissive for local dev
+app.config['SESSION_COOKIE_SAMESITE'] = 'None'  # Required for iframe embedding
 app.config['SESSION_COOKIE_PATH'] = '/'
-CORS(app)  # Enable CORS for all routes
+CORS(app, supports_credentials=True)  # Enable CORS for all routes with credentials
 
 # 시크릿 키 설정 (세션 암호화에 사용)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'vision_llm_agent_secret_key')
@@ -1372,13 +1372,10 @@ LOGIN_TEMPLATE = '''
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    # 이미 로그인된 사용자는 메인 페이지로 리디렉션
-    if current_user.is_authenticated and login_fresh():
-        print(f"User already authenticated and fresh as: {current_user.username}, redirecting to index")
+    # 이미 로그인된 사용자는 메인 페이지로 리디렉션 (remove fresh requirement for HF Spaces)
+    if current_user.is_authenticated:
+        print(f"User already authenticated as: {current_user.username}, redirecting to index")
         return redirect('/index.html')
-    elif current_user.is_authenticated and not login_fresh():
-        # Remember-cookie 상태 등 비-프레시 세션이면 로그인 페이지를 보여서 재인증 유도
-        print("User authenticated but session not fresh; showing login page for reauthentication")
     
     error = None
     if request.method == 'POST':
@@ -1404,7 +1401,12 @@ def login():
                 print(f"Redirecting to: {next_page}")
                 return redirect(next_page)
             print("Redirecting to index.html")
-            return redirect(url_for('serve_index_html'))
+            response = make_response(redirect(url_for('serve_index_html')))
+            # Set additional headers for HF Spaces compatibility
+            response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+            response.headers['Pragma'] = 'no-cache'
+            response.headers['Expires'] = '0'
+            return response
         else:
             error = 'Invalid username or password'
             print(f"Login failed: {error}")
@@ -1622,15 +1624,15 @@ def serve_static(filename):
 
 # 인덱스 HTML 직접 서빙 (로그인 필요)
 @app.route('/index.html')
-@fresh_login_required
+@login_required
 def serve_index_html():
     # 세션 및 쿠키 디버그 정보
     print(f"Request to /index.html - Session data: {dict(session)}")
     print(f"Request to /index.html - Cookies: {request.cookies}")
     print(f"Request to /index.html - User authenticated: {current_user.is_authenticated}")
     
-    # 인증 확인 (fresh session only)
-    if not current_user.is_authenticated or not login_fresh():
+    # 인증 확인 (remove fresh login requirement for HF Spaces)
+    if not current_user.is_authenticated:
         print("User not authenticated, redirecting to login")
         return redirect(url_for('login'))
     
