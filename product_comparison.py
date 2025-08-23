@@ -39,18 +39,20 @@ try:
     from langchain.tools.render import format_tool_to_openai_function
     from langchain_community.chat_models import ChatOpenAI
     from langchain_experimental.tools.python.tool import PythonAstREPLTool
+    LANGCHAIN_AVAILABLE = True
 except ImportError:
-    print("Warning: LangChain components not available. Installing required packages...")
-    import subprocess
-    subprocess.run(["pip", "install", "langchain", "langchain-openai", "langchain-community", "langchain-experimental"])
-    from langchain_core.prompts import ChatPromptTemplate
-    from langchain_core.output_parsers import StrOutputParser, JsonOutputParser
-    from langchain.agents import create_openai_functions_agent
-    from langchain.agents import AgentExecutor
-    from langchain.memory import ConversationBufferMemory
-    from langchain.tools.render import format_tool_to_openai_function
-    from langchain_community.chat_models import ChatOpenAI
-    from langchain_experimental.tools.python.tool import PythonAstREPLTool
+    print("Warning: LangChain components not available. Product comparison will work with limited functionality.")
+    # Set all LangChain components to None
+    ChatPromptTemplate = None
+    StrOutputParser = None
+    JsonOutputParser = None
+    create_openai_functions_agent = None
+    AgentExecutor = None
+    ConversationBufferMemory = None
+    format_tool_to_openai_function = None
+    ChatOpenAI = None
+    PythonAstREPLTool = None
+    LANGCHAIN_AVAILABLE = False
 
 # Import vision models if available
 try:
