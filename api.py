@@ -1130,7 +1130,8 @@ def stream_product_comparison(session_id):
                 print(f"[DEBUG] 📤 Sending {len(new_messages)} new messages")
                 for msg in new_messages:
                     print(f"[DEBUG] 📨 Message: {msg}")
-                    yield f"data: {json.dumps({'message': msg})}\n\n"
+                    # msg is already a dict with message, agent, timestamp
+                    yield f"data: {json.dumps(msg)}\n\n"
                 last_message_index = len(messages)
             
             # Send current status
