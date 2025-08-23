@@ -352,44 +352,45 @@ const ProductComparison = () => {
               
               {analysisResults.productInfo && (
                 <div>
-                  <Typography variant="subtitle1">
-                    <strong>Product Name:</strong> {analysisResults.productInfo.name}
-                  </Typography>
-                  <Typography variant="body1">
-                    <strong>Brand:</strong> {analysisResults.productInfo.brand}
-                  </Typography>
-                  <Typography variant="body1">
-                    <strong>Category:</strong> {analysisResults.productInfo.category}
-                  </Typography>
-                  
-                  <Typography variant="subtitle1" style={{ marginTop: '16px' }}>Key Specifications</Typography>
-                  <ul>
-                    {analysisResults.productInfo.specs.map((spec, index) => (
-                      <li key={index}>
-                        <Typography variant="body2">
-                          <strong>{spec.name}:</strong> {spec.value}
-                        </Typography>
-                      </li>
-                    ))}
-                  </ul>
-                  
-                  <Typography variant="subtitle1" style={{ marginTop: '16px' }}>Pros</Typography>
-                  <ul>
-                    {analysisResults.productInfo.pros.map((pro, index) => (
-                      <li key={index}>
-                        <Typography variant="body2">{pro}</Typography>
-                      </li>
-                    ))}
-                  </ul>
-                  
-                  <Typography variant="subtitle1" style={{ marginTop: '16px' }}>Cons</Typography>
-                  <ul>
-                    {analysisResults.productInfo.cons.map((con, index) => (
-                      <li key={index}>
-                        <Typography variant="body2">{con}</Typography>
-                      </li>
-                    ))}
-                  </ul>
+                  {Object.entries(analysisResults.productInfo).map(([imageKey, productData], index) => (
+                    <div key={imageKey} style={{ marginBottom: '24px' }}>
+                      <Typography variant="subtitle1" gutterBottom>
+                        <strong>Product {index + 1} ({imageKey})</strong>
+                      </Typography>
+                      
+                      <Typography variant="body1">
+                        <strong>Type:</strong> {productData.product_type || 'Unknown'}
+                      </Typography>
+                      
+                      {productData.key_features && productData.key_features.length > 0 && (
+                        <div style={{ marginTop: '12px' }}>
+                          <Typography variant="subtitle2">Key Features:</Typography>
+                          <ul>
+                            {productData.key_features.map((feature, idx) => (
+                              <li key={idx}>
+                                <Typography variant="body2">{feature}</Typography>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      
+                      {analysisResults.specifications && analysisResults.specifications[imageKey] && (
+                        <div style={{ marginTop: '12px' }}>
+                          <Typography variant="subtitle2">Specifications:</Typography>
+                          <ul>
+                            {Object.entries(analysisResults.specifications[imageKey].specifications || {}).map(([key, value]) => (
+                              <li key={key}>
+                                <Typography variant="body2">
+                                  <strong>{key.replace('_', ' ')}:</strong> {Array.isArray(value) ? value.join(', ') : value}
+                                </Typography>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               )}
             </CardContent>
@@ -405,35 +406,12 @@ const ProductComparison = () => {
               
               {analysisResults.comparison && (
                 <div>
-                  <Typography variant="subtitle1" gutterBottom>Product Specification Comparison</Typography>
-                  
-                  <table className={classes.comparisonTable}>
-                    <thead>
-                      <tr>
-                        <th>Feature</th>
-                        <th>Product A</th>
-                        <th>Product B</th>
-                        <th>Comparison</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {analysisResults.comparison.specs.map((spec, index) => (
-                        <tr key={index}>
-                          <td><strong>{spec.name}</strong></td>
-                          <td>{spec.valueA}</td>
-                          <td>{spec.valueB}</td>
-                          <td>
-                            <span className={spec.winner === 'A' ? classes.highlight : ''}>
-                              {spec.comparison}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  
-                  <Typography variant="subtitle1" style={{ marginTop: '16px' }}>Overall Comparison</Typography>
-                  <Typography variant="body1">{analysisResults.comparison.summary}</Typography>
+                  <Typography variant="body1" style={{ whiteSpace: 'pre-line', marginBottom: '16px' }}>
+                    {typeof analysisResults.comparison === 'string' 
+                      ? analysisResults.comparison 
+                      : JSON.stringify(analysisResults.comparison, null, 2)
+                    }
+                  </Typography>
                 </div>
               )}
             </CardContent>
@@ -449,28 +427,12 @@ const ProductComparison = () => {
               
               {analysisResults.valueAnalysis && (
                 <div>
-                  <Typography variant="subtitle1">Price Information</Typography>
-                  <Typography variant="body1">
-                    <strong>Product A:</strong> {analysisResults.valueAnalysis.priceA}
+                  <Typography variant="body1" style={{ whiteSpace: 'pre-line', marginBottom: '16px' }}>
+                    {typeof analysisResults.valueAnalysis === 'string' 
+                      ? analysisResults.valueAnalysis 
+                      : JSON.stringify(analysisResults.valueAnalysis, null, 2)
+                    }
                   </Typography>
-                  {analysisResults.valueAnalysis.priceB && (
-                    <Typography variant="body1">
-                      <strong>Product B:</strong> {analysisResults.valueAnalysis.priceB}
-                    </Typography>
-                  )}
-                  
-                  <Typography variant="subtitle1" style={{ marginTop: '16px' }}>Value Analysis</Typography>
-                  <Typography variant="body1">{analysisResults.valueAnalysis.analysis}</Typography>
-                  
-                  <Typography variant="subtitle1" style={{ marginTop: '16px' }}>Price-to-Performance Score</Typography>
-                  <Typography variant="body1">
-                    <strong>Product A:</strong> {analysisResults.valueAnalysis.valueScoreA}/10
-                  </Typography>
-                  {analysisResults.valueAnalysis.valueScoreB && (
-                    <Typography variant="body1">
-                      <strong>Product B:</strong> {analysisResults.valueAnalysis.valueScoreB}/10
-                    </Typography>
-                  )}
                 </div>
               )}
             </CardContent>
@@ -486,37 +448,21 @@ const ProductComparison = () => {
               
               {analysisResults.recommendation && (
                 <div>
-                  <Typography variant="subtitle1" className={classes.highlight}>
-                    Recommended Product: {analysisResults.recommendation.recommendedProduct}
+                  <Typography variant="body1" style={{ whiteSpace: 'pre-line', marginBottom: '16px' }}>
+                    {typeof analysisResults.recommendation === 'string' 
+                      ? analysisResults.recommendation 
+                      : JSON.stringify(analysisResults.recommendation, null, 2)
+                    }
                   </Typography>
-                  
-                  <Typography variant="body1" style={{ marginTop: '16px' }}>
-                    {analysisResults.recommendation.reason}
+                </div>
+              )}
+              
+              {/* Fallback: Display all analysis results as JSON if no specific data found */}
+              {!analysisResults.recommendation && !analysisResults.valueAnalysis && !analysisResults.comparison && !analysisResults.productInfo && (
+                <div>
+                  <Typography variant="body1" style={{ whiteSpace: 'pre-line', marginBottom: '16px' }}>
+                    {JSON.stringify(analysisResults, null, 2)}
                   </Typography>
-                  
-                  <Typography variant="subtitle1" style={{ marginTop: '16px' }}>Alternative Products</Typography>
-                  <ul>
-                    {analysisResults.recommendation.alternatives.map((alt, index) => (
-                      <li key={index}>
-                        <Typography variant="body2">
-                          <strong>{alt.name}</strong>: {alt.reason}
-                        </Typography>
-                      </li>
-                    ))}
-                  </ul>
-                  
-                  {analysisResults.recommendation.buyingTips && (
-                    <>
-                      <Typography variant="subtitle1" style={{ marginTop: '16px' }}>Buying Tips</Typography>
-                      <ul>
-                        {analysisResults.recommendation.buyingTips.map((tip, index) => (
-                          <li key={index}>
-                            <Typography variant="body2">{tip}</Typography>
-                          </li>
-                        ))}
-                      </ul>
-                    </>
-                  )}
                 </div>
               )}
             </CardContent>

@@ -164,11 +164,11 @@ class BaseAgent:
                     api_key = os.environ.get('OPENAI_API_KEY')
                     if api_key:
                         self.llm = ChatOpenAI(
-                            model="gpt-4o",
+                            model="gpt-4",
                             temperature=0.7,
                             api_key=api_key
                         )
-                        print(f"Initialized {name} with ChatOpenAI (gpt-3.5-turbo)")
+                        print(f"Initialized {name} with ChatOpenAI (gpt-4)")
                     else:
                         print(f"Warning: OPENAI_API_KEY not found. {name} will use fallback mode.")
                         self.llm = None
