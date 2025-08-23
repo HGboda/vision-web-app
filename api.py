@@ -1009,7 +1009,9 @@ def start_product_comparison():
                 img1 = request.files['image1']
                 print(f"[DEBUG] 🖼️ Processing image1: {img1.filename}")
                 try:
-                    images.append(Image.open(img1.stream))
+                    # Load image and convert to RGB to ensure it's fully loaded in memory
+                    image = Image.open(img1.stream).convert('RGB')
+                    images.append(image)
                     print(f"[DEBUG] ✅ Image1 processed successfully")
                 except Exception as e:
                     print(f"[DEBUG] ❌ Error processing image1: {e}")
@@ -1018,7 +1020,9 @@ def start_product_comparison():
                 img2 = request.files['image2']
                 print(f"[DEBUG] 🖼️ Processing image2: {img2.filename}")
                 try:
-                    images.append(Image.open(img2.stream))
+                    # Load image and convert to RGB to ensure it's fully loaded in memory
+                    image = Image.open(img2.stream).convert('RGB')
+                    images.append(image)
                     print(f"[DEBUG] ✅ Image2 processed successfully")
                 except Exception as e:
                     print(f"[DEBUG] ❌ Error processing image2: {e}")
