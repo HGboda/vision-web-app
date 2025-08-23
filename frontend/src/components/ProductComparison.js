@@ -25,7 +25,7 @@ const useStyles = makeStyles((theme) => ({
   },
   imageContainer: {
     position: 'relative',
-    minHeight: '200px',
+    minHeight: '360px',
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
@@ -33,6 +33,8 @@ const useStyles = makeStyles((theme) => ({
     borderRadius: '8px',
     margin: theme.spacing(1),
     padding: theme.spacing(1),
+    backgroundColor: '#fafafa',
+    overflow: 'hidden',
   },
   progressLog: {
     marginTop: theme.spacing(2),
@@ -64,8 +66,9 @@ const useStyles = makeStyles((theme) => ({
     marginRight: theme.spacing(1),
   },
   imagePreview: {
-    maxWidth: '100%',
-    maxHeight: '300px',
+    width: '100%',
+    height: 'auto',
+    maxHeight: '60vh',
     objectFit: 'contain',
   },
   uploadIcon: {
@@ -245,8 +248,8 @@ const ProductComparison = () => {
     return eventSource;
   };
 
-  // 제품 분석 처리 핸들러
-  const handleAnalysis = async () => {
+  // 제품 분석 처리 핸들러 (analysisType 강제 가능)
+  const handleAnalysis = async (analysisOverride = null) => {
     // 유효성 검사: 최소 1개 이상의 이미지가 있어야 함
     if (!images[0] && !images[1]) {
       setError('Please upload at least one product image for analysis');
@@ -271,9 +274,9 @@ const ProductComparison = () => {
         addLog('Product B image uploaded.', 'info');
       }
       
-      // 분석 타입 추가 (탭 인덱스로 구분)
+      // 분석 타입 추가 (탭 인덱스로 구분) 혹은 명시적 override
       const analysisTypes = ['info', 'compare', 'value', 'recommend'];
-      const analysisType = analysisTypes[tabValue];
+      const analysisType = analysisOverride || analysisTypes[tabValue];
       formData.append('analysisType', analysisType);
       addLog(`Analysis type: ${analysisType === 'info' ? 'Product Information' : analysisType === 'compare' ? 'Performance Comparison' : analysisType === 'value' ? 'Value Analysis' : 'Purchase Recommendation'}`, 'system');
       
@@ -557,6 +560,41 @@ const ProductComparison = () => {
               </Box>
             </Grid>
           ))}
+
+          {/* 다중 파일 업로드 (선택 사항): 두 장을 한 번에 업로드 */}
+          <Grid item xs={12}>
+            <input
+              accept="image/*"
+              className={classes.uploadInput}
+              id="upload-both-images"
+              type="file"
+              multiple
+              onChange={(e) => {
+                const files = Array.from(e.target.files || []);
+                if (!files.length) return;
+                const newImages = [...images];
+                const newPreviews = [...imagePreviews];
+                files.slice(0, 2).forEach((file, idx) => {
+                  const slot = idx; // 0,1 순서로 채움
+                  newImages[slot] = file;
+                  const reader = new FileReader();
+                  reader.onload = (ev) => {
+                    newPreviews[slot] = ev.target.result;
+                    setImagePreviews([...newPreviews]);
+                  };
+                  reader.readAsDataURL(file);
+                });
+                setImages(newImages);
+                setAnalysisResults(null);
+                setError(null);
+              }}
+            />
+            <label htmlFor="upload-both-images">
+              <Button variant="text" color="default" component="span">
+                Or select two files at once
+              </Button>
+            </label>
+          </Grid>
           
           {/* 분석 유형 탭 */}
           <Grid item xs={12}>
@@ -574,15 +612,24 @@ const ProductComparison = () => {
                 <Tab label="Recommendations" />
               </Tabs>
               
-              <Box p={2} textAlign="center">
+              <Box p={2} display="flex" justifyContent="center" gridGap={12}>
                 <Button
                   variant="contained"
                   color="primary"
-                  onClick={handleAnalysis}
+                  onClick={() => handleAnalysis(null)}
                   disabled={isProcessing || (!images[0] && !images[1])}
                   startIcon={isProcessing ? <CircularProgress size={24} /> : null}
                 >
                   {isProcessing ? 'Analyzing...' : 'Start Analysis'}
+                </Button>
+                <Button
+                  variant="outlined"
+                  color="secondary"
+                  onClick={() => handleAnalysis('compare')}
+                  disabled={isProcessing || !images[0] || !images[1]}
+                  startIcon={<Compare />}
+                >
+                  Compare Products
                 </Button>
               </Box>
               
