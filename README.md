@@ -12,6 +12,22 @@ license: gpl-3.0
 
 A multi-model object detection and image classification demo with LLM-based AI assistant for answering questions about detected objects. This project uses YOLOv8, DETR, and ViT models for vision tasks, and TinyLlama for natural language processing. The application includes a secure login system to protect access to the AI features.
 
+## 🎬 Demo
+
+![Vision LLM Agent Demo](demo.gif)
+
+*Live demo showing product comparison analysis with image upload, real-time processing, and detailed results across multiple analysis tabs.*
+
+## ✨ Features
+
+- **Multi-Model Object Detection**: YOLOv8, DETR, and ViT models for comprehensive image analysis
+- **Product Comparison**: AI-powered comparison of multiple products with detailed analysis
+- **Real-time Processing**: Live streaming of analysis progress with SSE (Server-Sent Events)
+- **Secure Authentication**: Protected access with Flask-Login session management
+- **Modern UI**: React frontend with Material-UI components
+- **Vector Database**: Similarity search and object recognition capabilities
+- **OpenAI Integration**: GPT-5-mini for intelligent analysis and recommendations
+
 ## Project Architecture
 
 This project follows a phased development approach:
