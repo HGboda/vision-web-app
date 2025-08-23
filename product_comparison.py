@@ -37,7 +37,7 @@ try:
     from langchain.agents import AgentExecutor
     from langchain.memory import ConversationBufferMemory
     from langchain.tools.render import format_tool_to_openai_function
-    from langchain_community.chat_models import ChatOpenAI
+    from langchain_openai import ChatOpenAI
     from langchain_experimental.tools.python.tool import PythonAstREPLTool
     LANGCHAIN_AVAILABLE = True
 except ImportError:
