@@ -343,19 +343,26 @@ class ImageProcessingAgent(BaseAgent):
                         key = key.strip().lower().replace(' ', '_').strip('"').strip("'")
                         # Clean up value more thoroughly
                         value = value.strip().rstrip(',').rstrip(';')
-                        # Remove mismatched quotes
-                        if value.startswith('"') and not value.endswith('"'):
-                            value = value[1:]
-                        elif value.endswith('"') and not value.startswith('"'):
-                            value = value[:-1]
-                        if value.startswith("'") and not value.endswith("'"):
-                            value = value[1:]
-                        elif value.endswith("'") and not value.startswith("'"):
-                            value = value[:-1]
-                        # Clean up array-like strings
-                        if value.startswith('[') and not value.endswith(']'):
-                            value = value + ']'
-                        if key and value and value not in ['null', 'None', '']:
+                        # Remove all types of quotes completely for cleaner values
+                        value = value.strip('"').strip("'")
+                        # Handle empty quoted strings
+                        if value in ['""', "''", '""""', "''''", '']:
+                            value = "Unknown"
+                        # Clean up array-like strings - convert to proper arrays
+                        if value.startswith('[') and value.endswith(']'):
+                            try:
+                                # Try to parse as actual array
+                                import ast
+                                parsed_array = ast.literal_eval(value)
+                                if isinstance(parsed_array, list):
+                                    value = parsed_array
+                            except:
+                                # If parsing fails, clean up the string
+                                value = value.strip('[]').split(',') if value != '[]' else []
+                        elif value.startswith('[') and not value.endswith(']'):
+                            value = []
+                        
+                        if key and value not in ['null', 'None', None]:
                             extracted[key] = value
                 return extracted
         except Exception as e:
@@ -512,19 +519,26 @@ class FeatureExtractionAgent(BaseAgent):
                         key = key.strip().lower().replace(' ', '_').strip('"').strip("'")
                         # Clean up value more thoroughly
                         value = value.strip().rstrip(',').rstrip(';')
-                        # Remove mismatched quotes
-                        if value.startswith('"') and not value.endswith('"'):
-                            value = value[1:]
-                        elif value.endswith('"') and not value.startswith('"'):
-                            value = value[:-1]
-                        if value.startswith("'") and not value.endswith("'"):
-                            value = value[1:]
-                        elif value.endswith("'") and not value.startswith("'"):
-                            value = value[:-1]
-                        # Clean up array-like strings
-                        if value.startswith('[') and not value.endswith(']'):
-                            value = value + ']'
-                        if key and value and value not in ['null', 'None', '']:
+                        # Remove all types of quotes completely for cleaner values
+                        value = value.strip('"').strip("'")
+                        # Handle empty quoted strings
+                        if value in ['""', "''", '""""', "''''", '']:
+                            value = "Unknown"
+                        # Clean up array-like strings - convert to proper arrays
+                        if value.startswith('[') and value.endswith(']'):
+                            try:
+                                # Try to parse as actual array
+                                import ast
+                                parsed_array = ast.literal_eval(value)
+                                if isinstance(parsed_array, list):
+                                    value = parsed_array
+                            except:
+                                # If parsing fails, clean up the string
+                                value = value.strip('[]').split(',') if value != '[]' else []
+                        elif value.startswith('[') and not value.endswith(']'):
+                            value = []
+                        
+                        if key and value not in ['null', 'None', None]:
                             specs[key] = value
                 return specs
         except Exception as e:
@@ -671,19 +685,26 @@ class ComparisonAgent(BaseAgent):
                             key = key.strip().lower().replace(' ', '_').strip('"').strip("'")
                             # Clean up value more thoroughly
                             value = value.strip().rstrip(',').rstrip(';')
-                            # Remove mismatched quotes
-                            if value.startswith('"') and not value.endswith('"'):
-                                value = value[1:]
-                            elif value.endswith('"') and not value.startswith('"'):
-                                value = value[:-1]
-                            if value.startswith("'") and not value.endswith("'"):
-                                value = value[1:]
-                            elif value.endswith("'") and not value.startswith("'"):
-                                value = value[:-1]
-                            # Clean up array-like strings
-                            if value.startswith('[') and not value.endswith(']'):
-                                value = value + ']'
-                            if key and value and value not in ['null', 'None', '']:
+                            # Remove all types of quotes completely for cleaner values
+                            value = value.strip('"').strip("'")
+                            # Handle empty quoted strings
+                            if value in ['""', "''", '""""', "''''", '']:
+                                value = "Unknown"
+                            # Clean up array-like strings - convert to proper arrays
+                            if value.startswith('[') and value.endswith(']'):
+                                try:
+                                    # Try to parse as actual array
+                                    import ast
+                                    parsed_array = ast.literal_eval(value)
+                                    if isinstance(parsed_array, list):
+                                        value = parsed_array
+                                except:
+                                    # If parsing fails, clean up the string
+                                    value = value.strip('[]').split(',') if value != '[]' else []
+                            elif value.startswith('[') and not value.endswith(']'):
+                                value = []
+                            
+                            if key and value not in ['null', 'None', None]:
                                 comparison[key] = value
                     
                     return comparison
@@ -875,19 +896,26 @@ class RecommendationAgent(BaseAgent):
                             key = key.strip().lower().replace(' ', '_').strip('"').strip("'")
                             # Clean up value more thoroughly
                             value = value.strip().rstrip(',').rstrip(';')
-                            # Remove mismatched quotes
-                            if value.startswith('"') and not value.endswith('"'):
-                                value = value[1:]
-                            elif value.endswith('"') and not value.startswith('"'):
-                                value = value[:-1]
-                            if value.startswith("'") and not value.endswith("'"):
-                                value = value[1:]
-                            elif value.endswith("'") and not value.startswith("'"):
-                                value = value[:-1]
-                            # Clean up array-like strings
-                            if value.startswith('[') and not value.endswith(']'):
-                                value = value + ']'
-                            if key and value and value not in ['null', 'None', '']:
+                            # Remove all types of quotes completely for cleaner values
+                            value = value.strip('"').strip("'")
+                            # Handle empty quoted strings
+                            if value in ['""', "''", '""""', "''''", '']:
+                                value = "Unknown"
+                            # Clean up array-like strings - convert to proper arrays
+                            if value.startswith('[') and value.endswith(']'):
+                                try:
+                                    # Try to parse as actual array
+                                    import ast
+                                    parsed_array = ast.literal_eval(value)
+                                    if isinstance(parsed_array, list):
+                                        value = parsed_array
+                                except:
+                                    # If parsing fails, clean up the string
+                                    value = value.strip('[]').split(',') if value != '[]' else []
+                            elif value.startswith('[') and not value.endswith(']'):
+                                value = []
+                            
+                            if key and value not in ['null', 'None', None]:
                                 recommendation[key] = value
                     
                     return recommendation
