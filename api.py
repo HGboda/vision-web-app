@@ -1099,6 +1099,7 @@ def stream_product_comparison(session_id):
     
     def generate():
         """Generate SSE events for streaming"""
+        print(f"[DEBUG] 🌊 Starting SSE stream for session: {session_id}")
         coordinator = get_product_comparison_coordinator()
         last_message_index = 0
         retry_count = 0
@@ -1107,17 +1108,22 @@ def stream_product_comparison(session_id):
         while retry_count < max_retries:
             # Get current status
             status = coordinator.get_session_status(session_id)
+            print(f"[DEBUG] 📊 Session {session_id} status: {status}")
+            
             if status is None:
                 # Session not found
+                print(f"[DEBUG] ❌ Session {session_id} not found")
                 yield f"data: {json.dumps({'error': 'Session not found'})}\n\n"
                 break
             
             # Get all messages
             messages = coordinator.get_session_messages(session_id)
+            print(f"[DEBUG] 📝 Session {session_id} has {len(messages) if messages else 0} messages")
             
             # Send any new messages
             if messages and len(messages) > last_message_index:
                 new_messages = messages[last_message_index:]
+                print(f"[DEBUG] 📤 Sending {len(new_messages)} new messages")
                 for msg in new_messages:
                     yield f"data: {json.dumps({'message': msg})}\n\n"
                 last_message_index = len(messages)
@@ -1128,6 +1134,7 @@ def stream_product_comparison(session_id):
             # If completed or error, send final result and end stream
             if status in ['completed', 'error']:
                 result = coordinator.get_session_result(session_id)
+                print(f"[DEBUG] 🏁 Session {session_id} finished with status: {status}")
                 yield f"data: {json.dumps({'final_result': result})}\n\n"
                 break
             
@@ -1137,6 +1144,7 @@ def stream_product_comparison(session_id):
         
         # End the stream if we've reached max retries
         if retry_count >= max_retries:
+            print(f"[DEBUG] ⏰ Session {session_id} timed out after {max_retries} retries")
             yield f"data: {json.dumps({'error': 'Timeout waiting for results'})}\n\n"
     
     return Response(
@@ -1658,11 +1666,20 @@ def product_comparison_lite_page():
       const resultDiv = document.getElementById('result');
       eventSource.onmessage = function(event) {
         const data = JSON.parse(event.data);
-        if (data.type === 'log') {
+        console.log('Received SSE data:', data);
+        
+        if (data.message) {
           logDiv.textContent += data.message + '\\n';
           logDiv.scrollTop = logDiv.scrollHeight;
-        } else if (data.type === 'result') {
-          resultDiv.textContent = JSON.stringify(data.data, null, 2);
+        } else if (data.status) {
+          logDiv.textContent += 'Status: ' + data.status + '\\n';
+          logDiv.scrollTop = logDiv.scrollHeight;
+        } else if (data.final_result) {
+          resultDiv.textContent = JSON.stringify(data.final_result, null, 2);
+          eventSource.close();
+        } else if (data.error) {
+          logDiv.textContent += 'Error: ' + data.error + '\\n';
+          logDiv.scrollTop = logDiv.scrollHeight;
           eventSource.close();
         }
       };
