@@ -20,6 +20,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy backend code
 COPY api.py .
+COPY product_comparison.py .
 COPY static/ static/
 
 # Static files are already copied in the previous step
