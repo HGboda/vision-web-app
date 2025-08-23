@@ -156,45 +156,30 @@ class BaseAgent:
     def __init__(self, name, llm=None):
         self.name = name
         
-        # Use TinyLlama as the default LLM if none is provided
+        # Use LangChain ChatOpenAI as the default LLM if none is provided
         if llm is None:
             try:
-                # Initialize TinyLlama model
-                model_name = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
-                tokenizer = AutoTokenizer.from_pretrained(model_name)
-                model = AutoModelForCausalLM.from_pretrained(
-                    model_name,
-                    torch_dtype=torch.float16,
-                ).to("cuda" if torch.cuda.is_available() else "cpu")
-                
-                # Wrap the model for LangChain
-                self.llm = self._create_llm_wrapper(model, tokenizer)
+                if LANGCHAIN_AVAILABLE and ChatOpenAI is not None:
+                    # Initialize ChatOpenAI with environment variable for API key
+                    api_key = os.environ.get('OPENAI_API_KEY')
+                    if api_key:
+                        self.llm = ChatOpenAI(
+                            model="gpt-4o",
+                            temperature=0.7,
+                            api_key=api_key
+                        )
+                        print(f"Initialized {name} with ChatOpenAI (gpt-3.5-turbo)")
+                    else:
+                        print(f"Warning: OPENAI_API_KEY not found. {name} will use fallback mode.")
+                        self.llm = None
+                else:
+                    print(f"Warning: LangChain not available. {name} will use fallback mode.")
+                    self.llm = None
             except Exception as e:
-                print(f"Error loading TinyLlama: {e}")
-                # Fallback to a simple string output
+                print(f"Error initializing ChatOpenAI for {name}: {e}")
                 self.llm = None
         else:
             self.llm = llm
-    
-    def _create_llm_wrapper(self, model, tokenizer):
-        """Create a simple wrapper for the LLM model"""
-        # This is a simplified wrapper - in production, you'd use a proper LangChain integration
-        def generate_text(prompt, max_tokens=512):
-            inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
-            with torch.no_grad():
-                output = model.generate(
-                    **inputs,
-                    max_new_tokens=max_tokens,
-                    temperature=0.7,
-                    do_sample=True
-                )
-            response = tokenizer.decode(output[0], skip_special_tokens=True)
-            # Remove the prompt from the response
-            if response.startswith(prompt):
-                response = response[len(prompt):].strip()
-            return response
-        
-        return generate_text
     
     def log(self, session_id, message):
         """Log a message to the session"""
@@ -331,17 +316,26 @@ class ImageProcessingAgent(BaseAgent):
         - model: Any model information that can be determined
         - color: The main color of the product
         - key_features: List of notable visual features
-        """
+        
+        Return only valid JSON format."""
         
         try:
-            response = self.llm(prompt)
+            # Use LangChain's invoke method
+            response = self.llm.invoke(prompt)
+            
+            # Extract content from LangChain response
+            if hasattr(response, 'content'):
+                response_text = response.content
+            else:
+                response_text = str(response)
+            
             # Try to parse as JSON
             try:
-                extracted = json.loads(response)
+                extracted = json.loads(response_text)
                 return extracted
             except json.JSONDecodeError:
                 # If LLM output is not valid JSON, extract key information using simple parsing
-                lines = response.split('\n')
+                lines = response_text.split('\n')
                 extracted = {}
                 for line in lines:
                     if ':' in line:
@@ -470,14 +464,22 @@ class FeatureExtractionAgent(BaseAgent):
             """
         
         try:
-            response = self.llm(prompt)
+            # Use LangChain's invoke method
+            response = self.llm.invoke(prompt)
+            
+            # Extract content from LangChain response
+            if hasattr(response, 'content'):
+                response_text = response.content
+            else:
+                response_text = str(response)
+            
             # Try to parse as JSON
             try:
-                specs = json.loads(response)
+                specs = json.loads(response_text)
                 return specs
             except json.JSONDecodeError:
                 # If LLM output is not valid JSON, extract key information using simple parsing
-                lines = response.split('\n')
+                lines = response_text.split('\n')
                 specs = {}
                 for line in lines:
                     if ':' in line:
@@ -607,10 +609,18 @@ class ComparisonAgent(BaseAgent):
             """
             
             try:
-                response = self.llm(prompt)
+                # Use LangChain's invoke method
+                response = self.llm.invoke(prompt)
+                
+                # Extract content from LangChain response
+                if hasattr(response, 'content'):
+                    response_text = response.content
+                else:
+                    response_text = str(response)
+                
                 # Try to parse as JSON
                 try:
-                    comparison = json.loads(response)
+                    comparison = json.loads(response_text)
                     return comparison
                 except json.JSONDecodeError:
                     # If LLM output is not valid JSON, extract key sections using simple parsing
@@ -618,7 +628,7 @@ class ComparisonAgent(BaseAgent):
                     current_section = None
                     section_content = []
                     
-                    lines = response.split('\n')
+                    lines = response_text.split('\n')
                     for line in lines:
                         line = line.strip()
                         if not line:
@@ -807,14 +817,22 @@ class RecommendationAgent(BaseAgent):
             """
             
             try:
-                response = self.llm(prompt)
+                # Use LangChain's invoke method
+                response = self.llm.invoke(prompt)
+                
+                # Extract content from LangChain response
+                if hasattr(response, 'content'):
+                    response_text = response.content
+                else:
+                    response_text = str(response)
+                
                 # Try to parse as JSON
                 try:
-                    recommendation = json.loads(response)
+                    recommendation = json.loads(response_text)
                     return recommendation
                 except json.JSONDecodeError:
                     # If LLM output is not valid JSON, extract key information using simple parsing
-                    lines = response.split('\n')
+                    lines = response_text.split('\n')
                     recommendation = {}
                     
                     # Look for recommendation indicator

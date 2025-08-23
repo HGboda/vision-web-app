@@ -47,3 +47,5 @@ openai>=1.30.0
 # LangChain (RAG pipeline)
 langchain>=0.2.6
 langchain-openai>=0.1.16
+langchain-community>=0.2.6
+langchain-experimental>=0.0.60
