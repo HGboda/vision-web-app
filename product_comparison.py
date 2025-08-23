@@ -341,8 +341,21 @@ class ImageProcessingAgent(BaseAgent):
                     if ':' in line:
                         key, value = line.split(':', 1)
                         key = key.strip().lower().replace(' ', '_').strip('"').strip("'")
-                        value = value.strip().strip('"').strip("'").rstrip(',')
-                        if key and value and value != 'null':
+                        # Clean up value more thoroughly
+                        value = value.strip().rstrip(',').rstrip(';')
+                        # Remove mismatched quotes
+                        if value.startswith('"') and not value.endswith('"'):
+                            value = value[1:]
+                        elif value.endswith('"') and not value.startswith('"'):
+                            value = value[:-1]
+                        if value.startswith("'") and not value.endswith("'"):
+                            value = value[1:]
+                        elif value.endswith("'") and not value.startswith("'"):
+                            value = value[:-1]
+                        # Clean up array-like strings
+                        if value.startswith('[') and not value.endswith(']'):
+                            value = value + ']'
+                        if key and value and value not in ['null', 'None', '']:
                             extracted[key] = value
                 return extracted
         except Exception as e:
@@ -418,50 +431,62 @@ class FeatureExtractionAgent(BaseAgent):
         prompt = f"""Based on this product information, generate a detailed list of specifications.
         Product information: {json.dumps(product_info)}
         
-        For a {product_type}, extract or infer the following specifications in JSON format:
+        For a {product_type}, extract or infer the following specifications.
+        
+        IMPORTANT: Return ONLY valid JSON format. Do not include any explanatory text before or after the JSON.
+        
+        Required JSON structure for a {product_type}:
         """
         
         # Add product-specific specification types based on product type
         if "car" in product_type.lower() or "vehicle" in product_type.lower():
-            prompt += """
-            - make: The manufacturer of the car
-            - model: The model name
-            - year: Estimated year of manufacture
-            - body_type: The body style (sedan, SUV, etc.)
-            - fuel_type: The fuel type if identifiable
-            - engine: Engine specifications if identifiable
-            - color: Exterior color
-            - features: List of visible features
-            """
+            prompt += """{
+            "make": "The manufacturer of the car",
+            "model": "The model name", 
+            "year": "Estimated year of manufacture",
+            "body_type": "The body style (sedan, SUV, etc.)",
+            "fuel_type": "The fuel type if identifiable",
+            "engine": "Engine specifications if identifiable", 
+            "color": "Exterior color",
+            "features": ["List", "of", "visible", "features"]
+        }
+        
+        Example: {"make": "Toyota", "model": "Camry", "year": "2020", "body_type": "Sedan", "fuel_type": "Gasoline", "engine": "2.5L", "color": "Blue", "features": ["LED headlights", "Alloy wheels"]}"""
         elif "phone" in product_type.lower() or "smartphone" in product_type.lower():
-            prompt += """
-            - brand: The manufacturer
-            - model: The phone model
-            - screen_size: Estimated screen size
-            - camera: Visible camera specifications
-            - color: Device color
-            - generation: Device generation if identifiable
-            - features: List of visible features
-            """
+            prompt += """{
+            "brand": "The manufacturer",
+            "model": "The phone model",
+            "screen_size": "Estimated screen size",
+            "camera": "Visible camera specifications",
+            "color": "Device color",
+            "generation": "Device generation if identifiable",
+            "features": ["List", "of", "visible", "features"]
+        }
+        
+        Example: {"brand": "Apple", "model": "iPhone 14", "screen_size": "6.1 inches", "camera": "Dual camera", "color": "Blue", "generation": "14th", "features": ["Face ID", "Wireless charging"]}"""
         elif "laptop" in product_type.lower() or "computer" in product_type.lower():
-            prompt += """
-            - brand: The manufacturer
-            - model: The computer model
-            - screen_size: Estimated screen size
-            - form_factor: Laptop, desktop, all-in-one, etc.
-            - color: Device color
-            - features: List of visible features
-            """
+            prompt += """{
+            "brand": "The manufacturer",
+            "model": "The computer model",
+            "screen_size": "Estimated screen size",
+            "form_factor": "Laptop, desktop, all-in-one, etc.",
+            "color": "Device color",
+            "features": ["List", "of", "visible", "features"]
+        }
+        
+        Example: {"brand": "Dell", "model": "XPS 13", "screen_size": "13.3 inches", "form_factor": "Laptop", "color": "Silver", "features": ["Touchscreen", "Backlit keyboard"]}"""
         else:
             # Generic product specifications
-            prompt += """
-            - brand: The manufacturer if identifiable
-            - model: The product model if identifiable
-            - color: Product color
-            - dimensions: Estimated dimensions
-            - features: List of visible features
-            - materials: Visible materials used
-            """
+            prompt += """{
+            "brand": "The manufacturer if identifiable",
+            "model": "The product model if identifiable", 
+            "color": "Product color",
+            "dimensions": "Estimated dimensions",
+            "features": ["List", "of", "visible", "features"],
+            "materials": "Visible materials used"
+        }
+        
+        Example: {"brand": "Unknown", "model": "Unknown", "color": "Black", "dimensions": "Medium", "features": ["Modern design"], "materials": "Plastic"}"""
         
         try:
             # Use LangChain's invoke method
@@ -485,8 +510,21 @@ class FeatureExtractionAgent(BaseAgent):
                     if ':' in line:
                         key, value = line.split(':', 1)
                         key = key.strip().lower().replace(' ', '_').strip('"').strip("'")
-                        value = value.strip().strip('"').strip("'").rstrip(',')
-                        if key and value and value != 'null':
+                        # Clean up value more thoroughly
+                        value = value.strip().rstrip(',').rstrip(';')
+                        # Remove mismatched quotes
+                        if value.startswith('"') and not value.endswith('"'):
+                            value = value[1:]
+                        elif value.endswith('"') and not value.startswith('"'):
+                            value = value[:-1]
+                        if value.startswith("'") and not value.endswith("'"):
+                            value = value[1:]
+                        elif value.endswith("'") and not value.startswith("'"):
+                            value = value[:-1]
+                        # Clean up array-like strings
+                        if value.startswith('[') and not value.endswith(']'):
+                            value = value + ']'
+                        if key and value and value not in ['null', 'None', '']:
                             specs[key] = value
                 return specs
         except Exception as e:
@@ -628,12 +666,24 @@ class ComparisonAgent(BaseAgent):
                     comparison = {}
                     
                     for line in lines:
-                        line = line.strip()
-                        if ':' in line and not line.startswith(' '):
+                        if ':' in line:
                             key, value = line.split(':', 1)
                             key = key.strip().lower().replace(' ', '_').strip('"').strip("'")
-                            value = value.strip().strip('"').strip("'").rstrip(',')
-                            if key and value and value != 'null':
+                            # Clean up value more thoroughly
+                            value = value.strip().rstrip(',').rstrip(';')
+                            # Remove mismatched quotes
+                            if value.startswith('"') and not value.endswith('"'):
+                                value = value[1:]
+                            elif value.endswith('"') and not value.startswith('"'):
+                                value = value[:-1]
+                            if value.startswith("'") and not value.endswith("'"):
+                                value = value[1:]
+                            elif value.endswith("'") and not value.startswith("'"):
+                                value = value[:-1]
+                            # Clean up array-like strings
+                            if value.startswith('[') and not value.endswith(']'):
+                                value = value + ']'
+                            if key and value and value not in ['null', 'None', '']:
                                 comparison[key] = value
                     
                     return comparison
@@ -823,8 +873,21 @@ class RecommendationAgent(BaseAgent):
                         if ':' in line:
                             key, value = line.split(':', 1)
                             key = key.strip().lower().replace(' ', '_').strip('"').strip("'")
-                            value = value.strip().strip('"').strip("'").rstrip(',')
-                            if key and value and value != 'null':
+                            # Clean up value more thoroughly
+                            value = value.strip().rstrip(',').rstrip(';')
+                            # Remove mismatched quotes
+                            if value.startswith('"') and not value.endswith('"'):
+                                value = value[1:]
+                            elif value.endswith('"') and not value.startswith('"'):
+                                value = value[:-1]
+                            if value.startswith("'") and not value.endswith("'"):
+                                value = value[1:]
+                            elif value.endswith("'") and not value.startswith("'"):
+                                value = value[:-1]
+                            # Clean up array-like strings
+                            if value.startswith('[') and not value.endswith(']'):
+                                value = value + ']'
+                            if key and value and value not in ['null', 'None', '']:
                                 recommendation[key] = value
                     
                     return recommendation
