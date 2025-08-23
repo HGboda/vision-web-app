@@ -57,13 +57,45 @@ from chromadb.utils import embedding_functions
 
 app = Flask(__name__, static_folder='static')
 
-# Import product comparison coordinator
+# Import product comparison coordinator with detailed debugging
+print("=" * 80)
+print("[STARTUP DEBUG] 🚀 Testing product_comparison import at startup...")
+print("=" * 80)
+
 try:
+    print("[DEBUG] Attempting to import product_comparison module...")
     from product_comparison import get_product_comparison_coordinator, decode_base64_image
-except ImportError:
+    print("[DEBUG] ✓ Product comparison module imported successfully!")
+    print(f"[DEBUG] ✓ get_product_comparison_coordinator: {get_product_comparison_coordinator}")
+    print(f"[DEBUG] ✓ decode_base64_image: {decode_base64_image}")
+    
+    # Test coordinator creation
+    print("[DEBUG] Testing coordinator creation...")
+    test_coordinator = get_product_comparison_coordinator()
+    print(f"[DEBUG] ✓ Test coordinator created: {type(test_coordinator).__name__}")
+    
+except ImportError as e:
+    print(f"[DEBUG] ❌ Product comparison import failed: {e}")
+    print(f"[DEBUG] ❌ Import error type: {type(e).__name__}")
+    print(f"[DEBUG] ❌ Import error args: {e.args}")
+    import traceback
+    print("[DEBUG] ❌ Full import traceback:")
+    traceback.print_exc()
     print("Warning: Product comparison module not available")
     get_product_comparison_coordinator = None
     decode_base64_image = None
+except Exception as e:
+    print(f"[DEBUG] ❌ Unexpected error during import: {e}")
+    print(f"[DEBUG] ❌ Error type: {type(e).__name__}")
+    import traceback
+    print("[DEBUG] ❌ Full traceback:")
+    traceback.print_exc()
+    get_product_comparison_coordinator = None
+    decode_base64_image = None
+
+print("=" * 80)
+print(f"[STARTUP DEBUG] 🏁 Import test completed. Coordinator available: {get_product_comparison_coordinator is not None}")
+print("=" * 80)
 # 환경 변수에서 비밀 키를 가져오거나, 없으면 안전한 랜덤 키 생성
 secret_key = os.environ.get('FLASK_SECRET_KEY')
 if not secret_key:
@@ -929,6 +961,8 @@ def add_detected_objects():
 
 
 # Product Comparison API Endpoints
+
+
 @app.route('/api/product/compare/start', methods=['POST'])
 @login_required
 def start_product_comparison():
