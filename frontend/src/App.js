@@ -9,13 +9,16 @@ import {
   AppBar,
   Toolbar,
   ThemeProvider,
-  createMuiTheme
+  createMuiTheme,
+  Tabs,
+  Tab
 } from '@material-ui/core';
 import ImageUploader from './components/ImageUploader';
 import ModelSelector from './components/ModelSelector';
 import ResultDisplay from './components/ResultDisplay';
 import LlmAnalysis from './components/LlmAnalysis';
 import OpenAIChat from './components/OpenAIChat';
+import ProductComparison from './components/ProductComparison';
 import './App.css';
 
 // Create a theme
@@ -45,6 +48,7 @@ function App() {
     detr: false,
     vit: false
   });
+  const [activeTab, setActiveTab] = useState(0);
 
   // Check API status on component mount
   useEffect(() => {
@@ -140,12 +144,23 @@ function App() {
         <AppBar position="static">
           <Toolbar>
             <Typography variant="h6" style={{ flexGrow: 1 }}>
-              Multi-Model Object Detection Demo
+              Vision LLM Multi-Agent System
             </Typography>
           </Toolbar>
+          <Tabs 
+            value={activeTab} 
+            onChange={(e, newValue) => setActiveTab(newValue)} 
+            indicatorColor="secondary"
+            textColor="inherit"
+            centered
+          >
+            <Tab label="Object Detection" />
+            <Tab label="Product Comparison" />
+          </Tabs>
         </AppBar>
         <Container maxWidth="lg" style={{ marginTop: theme.spacing(4), marginBottom: theme.spacing(4) }}>
-          <Grid container spacing={3}>
+          {activeTab === 0 ? (
+            <Grid container spacing={3}>
             <Grid item xs={12}>
               <Paper style={{ padding: theme.spacing(2) }}>
                 <Typography variant="h5" gutterBottom>
@@ -212,6 +227,9 @@ function App() {
               <OpenAIChat imageBase64={imageBase64} />
             </Grid>
           </Grid>
+          ) : (
+            <ProductComparison />
+          )}
         </Container>
       </Box>
     </ThemeProvider>

@@ -3,7 +3,7 @@
 import os
 os.environ['MPLCONFIGDIR'] = '/tmp/matplotlib'
 
-from flask import Flask, request, jsonify, send_from_directory, redirect, url_for, session, render_template_string, make_response
+from flask import Flask, request, jsonify, send_from_directory, redirect, url_for, session, render_template_string, make_response, Response, stream_with_context
 from datetime import timedelta
 import torch
 from PIL import Image
@@ -19,6 +19,8 @@ from flask_cors import CORS
 import json
 import sys
 import requests
+import asyncio
+from threading import Thread
 try:
     from openai import OpenAI
 except Exception as _e:
@@ -54,6 +56,14 @@ import chromadb
 from chromadb.utils import embedding_functions
 
 app = Flask(__name__, static_folder='static')
+
+# Import product comparison coordinator
+try:
+    from product_comparison import get_product_comparison_coordinator, decode_base64_image
+except ImportError:
+    print("Warning: Product comparison module not available")
+    get_product_comparison_coordinator = None
+    decode_base64_image = None
 # 환경 변수에서 비밀 키를 가져오거나, 없으면 안전한 랜덤 키 생성
 secret_key = os.environ.get('FLASK_SECRET_KEY')
 if not secret_key:
@@ -891,6 +901,168 @@ def add_detected_objects():
                 object_ids.append(object_id)
                 object_embeddings.append(embedding)
                 object_metadatas.append(metadata)
+            except Exception as e:
+                print(f"Error processing object: {e}")
+                continue
+        
+        # Add to vector DB
+        if object_ids and object_embeddings and object_metadatas:
+            object_collection.add(
+                ids=object_ids,
+                embeddings=object_embeddings,
+                metadatas=object_metadatas
+            )
+            
+            return jsonify({
+                "success": True,
+                "message": f"Added {len(object_ids)} objects to collection",
+                "object_ids": object_ids
+            })
+        else:
+            return jsonify({
+                "warning": "No valid objects to add"
+            })
+            
+    except Exception as e:
+        print(f"Error in add-detected-objects API: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+# Product Comparison API Endpoints
+@app.route('/api/product/compare/start', methods=['POST'])
+@login_required
+def start_product_comparison():
+    """Start a new product comparison session"""
+    if get_product_comparison_coordinator is None:
+        return jsonify({"error": "Product comparison module not available"}), 500
+    
+    try:
+        # Generate session ID if provided in form or query params, otherwise create new one
+        session_id = request.form.get('session_id') or request.args.get('session_id') or str(uuid.uuid4())
+        
+        # Get analysis type if provided (info, compare, value, recommend)
+        analysis_type = request.form.get('analysisType') or request.args.get('analysisType', 'info')
+        
+        # Process images from FormData or JSON
+        images = []
+        
+        # Check if request is multipart form data
+        if request.files:
+            # Handle FormData with file uploads (from frontend)
+            if 'image1' in request.files and request.files['image1']:
+                img1 = request.files['image1']
+                try:
+                    images.append(Image.open(img1.stream))
+                except Exception as e:
+                    print(f"Error processing image1: {e}")
+                    
+            if 'image2' in request.files and request.files['image2']:
+                img2 = request.files['image2']
+                try:
+                    images.append(Image.open(img2.stream))
+                except Exception as e:
+                    print(f"Error processing image2: {e}")
+                    
+        # Fallback to JSON with base64 images (for API testing)
+        elif request.json and 'images' in request.json:
+            image_data_list = request.json.get('images', [])
+            for image_data in image_data_list:
+                img = decode_base64_image(image_data)
+                if img is not None:
+                    images.append(img)
+                    
+        if not images:
+            return jsonify({"error": "No valid images provided"}), 400
+        
+        # Get coordinator instance
+        coordinator = get_product_comparison_coordinator()
+        
+        # Pass the analysis type and session metadata to the coordinator
+        session_metadata = {
+            'analysis_type': analysis_type,
+            'timestamp': time.strftime('%Y-%m-%d %H:%M:%S')
+        }
+        
+        # Start processing in a background thread
+        def run_async_task(loop):
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(coordinator.process_images(session_id, images, session_metadata))
+        
+        loop = asyncio.new_event_loop()
+        thread = Thread(target=run_async_task, args=(loop,))
+        thread.daemon = True
+        thread.start()
+        
+        # Return session ID for client to use with streaming endpoint
+        return jsonify({
+            "session_id": session_id,
+            "message": "Product comparison started",
+            "status": "processing"
+        })
+        
+    except Exception as e:
+        print(f"Error starting product comparison: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/product/compare/stream/<session_id>', methods=['GET'])
+@login_required
+def stream_product_comparison(session_id):
+    """Stream updates from a product comparison session"""
+    if get_product_comparison_coordinator is None:
+        return jsonify({"error": "Product comparison module not available"}), 500
+    
+    def generate():
+        """Generate SSE events for streaming"""
+        coordinator = get_product_comparison_coordinator()
+        last_message_index = 0
+        retry_count = 0
+        max_retries = 300  # 5 minutes at 1 second intervals
+        
+        while retry_count < max_retries:
+            # Get current status
+            status = coordinator.get_session_status(session_id)
+            if status is None:
+                # Session not found
+                yield f"data: {json.dumps({'error': 'Session not found'})}\n\n"
+                break
+            
+            # Get all messages
+            messages = coordinator.get_session_messages(session_id)
+            
+            # Send any new messages
+            if messages and len(messages) > last_message_index:
+                new_messages = messages[last_message_index:]
+                for msg in new_messages:
+                    yield f"data: {json.dumps({'message': msg})}\n\n"
+                last_message_index = len(messages)
+            
+            # Send current status
+            yield f"data: {json.dumps({'status': status})}\n\n"
+            
+            # If completed or error, send final result and end stream
+            if status in ['completed', 'error']:
+                result = coordinator.get_session_result(session_id)
+                yield f"data: {json.dumps({'final_result': result})}\n\n"
+                break
+            
+            # Wait before next update
+            time.sleep(1)
+            retry_count += 1
+        
+        # End the stream if we've reached max retries
+        if retry_count >= max_retries:
+            yield f"data: {json.dumps({'error': 'Timeout waiting for results'})}\n\n"
+    
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={
+            'Cache-Control': 'no-cache',
+            'X-Accel-Buffering': 'no',
+            'Content-Type': 'text/event-stream',
+        }
+    )
             except Exception as e:
                 print(f"Error processing object: {e}")
                 continue
