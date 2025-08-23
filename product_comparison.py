@@ -912,7 +912,16 @@ class RecommendationAgent(BaseAgent):
         
         # Log confidence
         confidence = recommendation.get('confidence', 0)
-        confidence_percent = f"{int(confidence * 100)}%"
+        try:
+            # Handle various confidence formats
+            if isinstance(confidence, str):
+                # Extract first valid number from string like '0.70.70.70...'
+                confidence_clean = confidence.split('.')[0] + '.' + confidence.split('.')[1] if '.' in confidence else confidence
+                confidence = float(confidence_clean)
+            confidence = float(confidence)
+            confidence_percent = f"{int(confidence * 100)}%"
+        except (ValueError, IndexError):
+            confidence_percent = "Unknown"
         self.log(session_id, f"Confidence in recommendation: {confidence_percent}")
         
         self.log(session_id, "Recommendation generation completed")
