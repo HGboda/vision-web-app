@@ -95,6 +95,8 @@ except Exception as e:
 
 print("=" * 80)
 print(f"[STARTUP DEBUG] 🏁 Import test completed. Coordinator available: {get_product_comparison_coordinator is not None}")
+print(f"[STARTUP DEBUG] 📁 Current working directory: {os.getcwd()}")
+print(f"[STARTUP DEBUG] 📂 Files in current directory: {os.listdir('.')}")
 print("=" * 80)
 # 환경 변수에서 비밀 키를 가져오거나, 없으면 안전한 랜덤 키 생성
 secret_key = os.environ.get('FLASK_SECRET_KEY')
