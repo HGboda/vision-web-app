@@ -340,9 +340,9 @@ class ImageProcessingAgent(BaseAgent):
                 for line in lines:
                     if ':' in line:
                         key, value = line.split(':', 1)
-                        key = key.strip().lower().replace(' ', '_')
-                        value = value.strip().strip('"').strip("'")
-                        if key and value:
+                        key = key.strip().lower().replace(' ', '_').strip('"').strip("'")
+                        value = value.strip().strip('"').strip("'").rstrip(',')
+                        if key and value and value != 'null':
                             extracted[key] = value
                 return extracted
         except Exception as e:
@@ -484,9 +484,9 @@ class FeatureExtractionAgent(BaseAgent):
                 for line in lines:
                     if ':' in line:
                         key, value = line.split(':', 1)
-                        key = key.strip().lower().replace(' ', '_').strip('-').strip('_')
-                        value = value.strip().strip('"').strip("'")
-                        if key and value:
+                        key = key.strip().lower().replace(' ', '_').strip('"').strip("'")
+                        value = value.strip().strip('"').strip("'").rstrip(',')
+                        if key and value and value != 'null':
                             specs[key] = value
                 return specs
         except Exception as e:
@@ -624,35 +624,19 @@ class ComparisonAgent(BaseAgent):
                     return comparison
                 except json.JSONDecodeError:
                     # If LLM output is not valid JSON, extract key sections using simple parsing
-                    sections = {}
-                    current_section = None
-                    section_content = []
-                    
                     lines = response_text.split('\n')
+                    comparison = {}
+                    
                     for line in lines:
                         line = line.strip()
-                        if not line:
-                            continue
-                            
-                        if line.endswith(":") and not line.startswith("-"):
-                            # This is a section header
-                            if current_section and section_content:
-                                sections[current_section] = section_content
-                                section_content = []
-                            
-                            current_section = line.strip(":").lower().replace(" ", "_")
-                        elif line.startswith("-") and current_section:
-                            # This is a list item
-                            section_content.append(line.strip("- "))
-                        elif current_section:
-                            # This is content for the current section
-                            section_content.append(line)
+                        if ':' in line and not line.startswith(' '):
+                            key, value = line.split(':', 1)
+                            key = key.strip().lower().replace(' ', '_').strip('"').strip("'")
+                            value = value.strip().strip('"').strip("'").rstrip(',')
+                            if key and value and value != 'null':
+                                comparison[key] = value
                     
-                    # Add the last section
-                    if current_section and section_content:
-                        sections[current_section] = section_content
-                        
-                    return sections
+                    return comparison
             except Exception as e:
                 print(f"Error in LLM comparison: {e}")
                 # Fall back to simple comparison
@@ -835,24 +819,13 @@ class RecommendationAgent(BaseAgent):
                     lines = response_text.split('\n')
                     recommendation = {}
                     
-                    # Look for recommendation indicator
                     for line in lines:
-                        if "recommended product" in line.lower() and ("1" in line or "2" in line):
-                            recommendation["recommended_product"] = "1" if "1" in line else "2"
-                        elif "recommendation" in line.lower() and ":" in line:
-                            recommendation["recommendation"] = line.split(":", 1)[1].strip().strip('"')
-                        elif "reason" in line.lower() and ":" in line:
-                            recommendation["reason"] = line.split(":", 1)[1].strip().strip('"')
-                        elif "confidence" in line.lower() and ":" in line:
-                            try:
-                                conf_str = line.split(":", 1)[1].strip()
-                                conf = float(conf_str)
-                                recommendation["confidence"] = conf
-                            except ValueError:
-                                recommendation["confidence"] = 0.5
-                        elif "use cases" in line.lower() and ":" in line:
-                            use_cases = line.split(":", 1)[1].strip().strip('"')
-                            recommendation["use_cases"] = [uc.strip() for uc in use_cases.split(",")]
+                        if ':' in line:
+                            key, value = line.split(':', 1)
+                            key = key.strip().lower().replace(' ', '_').strip('"').strip("'")
+                            value = value.strip().strip('"').strip("'").rstrip(',')
+                            if key and value and value != 'null':
+                                recommendation[key] = value
                     
                     return recommendation
             except Exception as e:
