@@ -25,8 +25,10 @@ python-multipart>=0.0.5
 requests>=2.31.0
 
 # Llama 4 integration
-accelerator>=0.20.0
-bitsandbytes>=0.41.0
+# Use Hugging Face accelerate; "accelerator" was a typo and can cause install issues
+accelerate>=0.20.0
+# bitsandbytes is only supported on Linux x86_64; avoid install on macOS/ARM
+bitsandbytes>=0.41.0; platform_system == 'Linux' and platform_machine == 'x86_64'
 sentencepiece>=0.1.99
 protobuf>=4.23.0
 
@@ -36,7 +38,8 @@ chromadb>=0.4.18
 scipy>=1.10.0,<1.14.0; python_version < '3.12'
 scipy>=1.14.1,<1.15.0; python_version >= '3.12'
 open-clip-torch>=2.20.0
-pysqlite3-binary>=0.5.0
+# pysqlite3-binary needed for some Linux environments; skip on macOS
+pysqlite3-binary>=0.5.0; sys_platform == 'linux'
 
 # OpenAI Python SDK
 openai>=1.30.0

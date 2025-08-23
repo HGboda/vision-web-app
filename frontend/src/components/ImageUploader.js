@@ -56,10 +56,10 @@ const useStyles = makeStyles((theme) => ({
   imageContainer: {
     position: 'relative',
     width: '100%',
-    // Use viewport-based height so any aspect ratio fits inside
-    height: '60vh',
+    // Use a smaller viewport-based height so any aspect ratio fits inside
+    height: '45vh',
     [theme.breakpoints.down('sm')]: {
-      height: '45vh',
+      height: '35vh',
     },
     display: 'flex',
     justifyContent: 'center',
@@ -180,9 +180,10 @@ const ImageUploader = ({ onImageUpload }) => {
               alt="Preview"
               className="preview-image"
               style={{
-                width: '100%',
-                height: 'auto',
+                maxWidth: '100%',
                 maxHeight: '100%',
+                width: 'auto',
+                height: 'auto',
                 objectFit: 'contain',
                 display: 'block'
               }}

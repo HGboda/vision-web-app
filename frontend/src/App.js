@@ -11,7 +11,8 @@ import {
   ThemeProvider,
   createMuiTheme,
   Tabs,
-  Tab
+  Tab,
+  Button
 } from '@material-ui/core';
 import ImageUploader from './components/ImageUploader';
 import ModelSelector from './components/ModelSelector';

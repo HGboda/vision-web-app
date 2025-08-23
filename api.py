@@ -75,13 +75,13 @@ app.secret_key = secret_key  # 세션 암호화를 위한 비밀 키
 app.config['CORS_HEADERS'] = 'Content-Type'
 # Remember cookie (Flask-Login) — minimize duration to prevent auto re-login
 app.config['REMEMBER_COOKIE_DURATION'] = timedelta(seconds=1)
-app.config['REMEMBER_COOKIE_SECURE'] = True  # Spaces uses HTTPS
+app.config['REMEMBER_COOKIE_SECURE'] = False  # Allow HTTP for local dev
 app.config['REMEMBER_COOKIE_HTTPONLY'] = True
-app.config['REMEMBER_COOKIE_SAMESITE'] = 'None'
-# Session cookie (Flask-Session)
-app.config['SESSION_COOKIE_SECURE'] = True  # HTTPS
+app.config['REMEMBER_COOKIE_SAMESITE'] = 'Lax'
+# Session cookie (Flask-Session) - relaxed for local dev
+app.config['SESSION_COOKIE_SECURE'] = False  # Allow HTTP for local dev
 app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'None'
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # More permissive for local dev
 app.config['SESSION_COOKIE_PATH'] = '/'
 CORS(app)  # Enable CORS for all routes
 
@@ -985,8 +985,13 @@ def start_product_comparison():
         
         # Start processing in a background thread
         def run_async_task(loop):
-            asyncio.set_event_loop(loop)
-            loop.run_until_complete(coordinator.process_images(session_id, images, session_metadata))
+            try:
+                asyncio.set_event_loop(loop)
+                loop.run_until_complete(coordinator.process_images(session_id, images, session_metadata))
+            except Exception as e:
+                print(f"Error in async task: {e}")
+                import traceback
+                traceback.print_exc()
         
         loop = asyncio.new_event_loop()
         thread = Thread(target=run_async_task, args=(loop,))
@@ -1002,6 +1007,8 @@ def start_product_comparison():
         
     except Exception as e:
         print(f"Error starting product comparison: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 
@@ -1426,6 +1433,182 @@ def logout():
         print(f"[DEBUG] Error deleting remember_token cookie: {e}")
     return resp
 
+@app.route('/product-comparison-lite', methods=['GET'])
+@login_required
+def product_comparison_lite_page():
+    """Serve a lightweight two-image Product Comparison page (no React build required)."""
+    html = '''<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Product Comparison (Lite)</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 16px; }
+    .row { display: flex; gap: 16px; flex-wrap: wrap; }
+    .col { flex: 1 1 320px; min-width: 280px; }
+    .card { border: 1px solid #ddd; border-radius: 8px; padding: 12px; }
+    .preview-box { width: 100%; height: 45vh; max-height: 520px; border: 1px dashed #ccc; display:flex; align-items:center; justify-content:center; overflow:hidden; border-radius:6px; background:#fafafa; }
+    .preview-box img { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; }
+    input[type="file"] { display: none; }
+    .file-button { padding: 8px 12px; background: #3f51b5; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
+    .file-button:hover { background: #303f9f; }
+    .controls { margin-top: 12px; display:flex; gap: 8px; align-items:center; }
+    button { padding: 10px 14px; background: #3f51b5; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+    button:disabled { background: #9aa0c3; cursor: not-allowed; }
+    .log { white-space: pre-wrap; background:#fff; color:#333; border: 1px solid #ddd; padding:10px; border-radius:6px; height:180px; overflow:auto; font-size: 12px; }
+    .result { margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <h2>Product Comparison (Lite)</h2>
+  <div class="row">
+    <div class="col">
+      <div class="card">
+        <h3>Product Image 1</h3>
+        <div class="preview-box"><img id="img1" alt="Product 1 Preview" style="display:none;" /></div>
+        <div class="controls">
+          <input type="file" id="file1" accept="image/*" />
+          <button type="button" class="file-button" onclick="document.getElementById('file1').click()">Choose Image File</button>
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card">
+        <h3>Product Image 2</h3>
+        <div class="preview-box"><img id="img2" alt="Product 2 Preview" style="display:none;" /></div>
+        <div class="controls">
+          <input type="file" id="file2" accept="image/*" />
+          <button type="button" class="file-button" onclick="document.getElementById('file2').click()">Choose Image File</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="controls" style="margin-top:16px;">
+    <button id="compareBtn" disabled onclick="startCompare()">Compare Products</button>
+    <a href="/index.html" style="margin-left:8px;">Back to App</a>
+  </div>
+  <h3>Analysis Progress</h3>
+  <div id="log" class="log"></div>
+  <h3>Comparison Results</h3>
+  <pre id="result" class="result"></pre>
+
+  <script>
+    // Proactively unregister any active service workers
+    (function(){
+      if ('serviceWorker' in navigator) {
+        try {
+          navigator.serviceWorker.getRegistrations().then(function(regs){
+            regs.forEach(function(r){ r.unregister(); });
+          });
+        } catch (e) { /* ignore */ }
+      }
+    })();
+
+    let file1 = null, file2 = null;
+    
+    function handleFile(i, input) {
+      console.log('handleFile called for image', i, 'with input:', input);
+      const f = input.files && input.files[0];
+      if (!f) {
+        console.log('No file selected');
+        return;
+      }
+      console.log('File selected:', f.name, 'size:', f.size, 'type:', f.type);
+      
+      const url = URL.createObjectURL(f);
+      console.log('Object URL created:', url);
+      
+      const img = document.getElementById('img'+i);
+      console.log('Image element found:', img);
+      
+      if (img) {
+        img.src = url;
+        img.style.display = 'block';
+        img.style.visibility = 'visible';
+        console.log('Image src set and display changed to block');
+        
+        img.onload = function() {
+          console.log('Image ' + i + ' loaded successfully, dimensions:', img.naturalWidth, 'x', img.naturalHeight);
+        };
+        img.onerror = function() {
+          console.error('Failed to load image ' + i);
+        };
+      }
+      
+      if (i === 1) {
+        file1 = f;
+        console.log('File1 set:', f.name);
+      } else {
+        file2 = f;
+        console.log('File2 set:', f.name);
+      }
+      updateButton();
+    }
+    
+    function updateButton(){
+      const btn = document.getElementById('compareBtn');
+      const enabled = file1 && file2;
+      btn.disabled = !enabled;
+      console.log('Button state updated. File1:', !!file1, 'File2:', !!file2, 'Enabled:', enabled);
+    }
+    
+    async function startCompare() {
+      if (!file1 || !file2) return;
+      const formData = new FormData();
+      formData.append('image1', file1);
+      formData.append('image2', file2);
+      try {
+        const response = await fetch('/api/product/compare/start', {
+          method: 'POST',
+          body: formData
+        });
+        const data = await response.json();
+        if (data.session_id) {
+          streamResults(data.session_id);
+        }
+      } catch (error) {
+        console.error('Error starting comparison:', error);
+      }
+    }
+    
+    function streamResults(sessionId) {
+      const eventSource = new EventSource('/api/product/compare/stream/' + sessionId);
+      const logDiv = document.getElementById('log');
+      const resultDiv = document.getElementById('result');
+      eventSource.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+        if (data.type === 'log') {
+          logDiv.textContent += data.message + '\\n';
+          logDiv.scrollTop = logDiv.scrollHeight;
+        } else if (data.type === 'result') {
+          resultDiv.textContent = JSON.stringify(data.data, null, 2);
+          eventSource.close();
+        }
+      };
+      eventSource.onerror = function() {
+        eventSource.close();
+      };
+    }
+
+    // Add event listeners after DOM loads
+    document.addEventListener('DOMContentLoaded', function() {
+      document.getElementById('file1').addEventListener('change', function() {
+        handleFile(1, this);
+      });
+      document.getElementById('file2').addEventListener('change', function() {
+        handleFile(2, this);
+      });
+    });
+  </script>
+</body>
+</html>'''
+    resp = make_response(html)
+    resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    resp.headers['Pragma'] = 'no-cache'
+    resp.headers['Expires'] = '0'
+    return resp
+
 # 정적 파일 서빙을 위한 라우트 (로그인 불필요)
 @app.route('/static/<path:filename>')
 def serve_static(filename):
@@ -1439,6 +1622,7 @@ def serve_static(filename):
 
 # 인덱스 HTML 직접 서빙 (로그인 필요)
 @app.route('/index.html')
+@fresh_login_required
 def serve_index_html():
     # 세션 및 쿠키 디버그 정보
     print(f"Request to /index.html - Session data: {dict(session)}")
@@ -1467,6 +1651,16 @@ def serve_index_html():
         return send_from_directory(app.static_folder, 'index.html')
 
     heartbeat_script = """
+    <style>
+      /* Override preview image sizing from old builds without rebuild */
+      .preview-image { max-width: 100% !important; max-height: 100% !important; width: auto !important; height: auto !important; object-fit: contain !important; }
+      /* Ensure container is not too tall on desktop */
+      .preview-image-container, .image-container { height: 45vh !important; }
+      @media (max-width: 600px) { .preview-image-container, .image-container { height: 35vh !important; } }
+      /* Product Comparison navigation button */
+      .product-comparison-nav { position: fixed; top: 20px; right: 20px; z-index: 9999; background: #3f51b5; color: white; padding: 12px 16px; border-radius: 8px; text-decoration: none; font-weight: bold; box-shadow: 0 4px 8px rgba(0,0,0,0.2); transition: background 0.3s; }
+      .product-comparison-nav:hover { background: #303f9f; color: white; text-decoration: none; }
+    </style>
     <script>
     (function(){
       // 1) 세션 상태 주기 체크 (만료시 로그인으로)
@@ -1499,6 +1693,19 @@ def serve_index_html():
         window.addEventListener(evt, resetIdle, {passive:true});
       });
       resetIdle();
+
+      // 3) Add Product Comparison navigation button - DISABLED
+      function addProductComparisonButton() {
+        // Disabled - no longer adding Product Comparison button to main UI
+        return;
+      }
+      
+      // Add button after DOM is ready
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', addProductComparisonButton);
+      } else {
+        addProductComparisonButton();
+      }
     })();
     </script>
     """
@@ -1573,6 +1780,17 @@ def static_js_files(filename):
 def serve_react(path):
     """Serve React frontend"""
     print(f"Serving React frontend for path: {path}, user: {current_user.username if current_user.is_authenticated else 'not authenticated'}")
+    
+    # Skip specific routes that have their own handlers (but not index.html)
+    if path in ['product-comparison-lite', 'login', 'logout', 'similar-images', 'object-detection-search', 'model-vector-db', 'openai-chat']:
+        # Let Flask find the specific route handler
+        from flask import abort
+        abort(404)  # This will cause Flask to try other routes
+    
+    # For root path, redirect to index.html to ensure consistent behavior
+    if path == "":
+        return redirect('/index.html')
+    
     # 정적 파일 처리는 이제 별도 라우트에서 처리
     if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
         resp = send_from_directory(app.static_folder, path)
@@ -1595,6 +1813,15 @@ def serve_react(path):
             return resp
 
         heartbeat_script = """
+        <style>
+          /* Override preview image sizing from old builds without rebuild */
+          .preview-image { max-width: 100% !important; max-height: 100% !important; width: auto !important; height: auto !important; object-fit: contain !important; }
+          .preview-image-container, .image-container { height: 45vh !important; }
+          @media (max-width: 600px) { .preview-image-container, .image-container { height: 35vh !important; } }
+          /* Product Comparison navigation button */
+          .product-comparison-nav { position: fixed; top: 20px; right: 20px; z-index: 9999; background: #3f51b5; color: white; padding: 12px 16px; border-radius: 8px; text-decoration: none; font-weight: bold; box-shadow: 0 4px 8px rgba(0,0,0,0.2); transition: background 0.3s; }
+          .product-comparison-nav:hover { background: #303f9f; color: white; text-decoration: none; }
+        </style>
         <script>
         (function(){
           // 1) 세션 상태 주기 체크 (만료시 로그인으로)
@@ -1625,6 +1852,19 @@ def serve_react(path):
             window.addEventListener(evt, resetIdle, {passive:true});
           });
           resetIdle();
+
+          // 3) Add Product Comparison navigation button - DISABLED
+          function addProductComparisonButton() {
+            // Disabled - no longer adding Product Comparison button to main UI
+            return;
+          }
+          
+          // Add button after DOM is ready
+          if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', addProductComparisonButton);
+          } else {
+            addProductComparisonButton();
+          }
         })();
         </script>
         """
@@ -1972,5 +2212,5 @@ def index_page():
 
 if __name__ == "__main__":
     # 허깅페이스 Space에서는 PORT 환경 변수를 사용합니다
-    port = int(os.environ.get("PORT", 7860))
+    port = int(os.environ.get("FLASK_PORT", os.environ.get("PORT", 7860)))
     app.run(debug=False, host='0.0.0.0', port=port)

@@ -282,13 +282,25 @@ const ProductComparison = () => {
       
       // 백엔드 API 호출 (세션 시작)
       addLog('Initializing analysis session...', 'system');
+      
+      // Debug FormData contents
+      for (let [key, value] of formData.entries()) {
+        console.log('FormData:', key, value);
+      }
+      
       const response = await fetch('/api/product/compare/start', {
         method: 'POST',
         body: formData,
+        credentials: 'include', // 세션 쿠키 포함
       });
       
+      console.log('Response status:', response.status);
+      console.log('Response headers:', response.headers);
+      
       if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`);
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        throw new Error(`HTTP error! Status: ${response.status} - ${errorText}`);
       }
       
       const data = await response.json();
