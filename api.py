@@ -2045,7 +2045,7 @@ def openai_chat_api():
         return jsonify({"error": "Invalid JSON body"}), 400
 
     prompt = (data or {}).get('prompt', '').strip()
-    model = (data or {}).get('model') or os.environ.get('OPENAI_MODEL', 'gpt-4')
+    model = (data or {}).get('model') or os.environ.get('OPENAI_MODEL', 'gpt-5-mini')
     system = (data or {}).get('system') or 'You are a helpful assistant.'
     api_key = (data or {}).get('api_key') or os.environ.get('OPENAI_API_KEY')
 
@@ -2252,7 +2252,7 @@ def vision_rag_query():
         # Prefer OpenAI SDK for multimodal if available and we have an image
         if OpenAI is not None and top_data_url is not None:
             client = OpenAI(api_key=api_key)
-            model_used = os.environ.get('OPENAI_MODEL', 'gpt-4o')
+            model_used = os.environ.get('OPENAI_MODEL', 'gpt-5-mini')
             chat = client.chat.completions.create(
                 model=model_used,
                 messages=[
@@ -2269,7 +2269,7 @@ def vision_rag_query():
             answer = chat.choices[0].message.content if chat and chat.choices else ''
         else:
             # Fallback to existing LangChain text-only flow
-            llm = ChatOpenAI(api_key=api_key, model=os.environ.get('OPENAI_MODEL', 'gpt-4o'))
+            llm = ChatOpenAI(api_key=api_key, model=os.environ.get('OPENAI_MODEL', 'gpt-5-mini'))
             prompt = ChatPromptTemplate.from_messages([
                 ("system", system_text),
                 ("human", "{input}")
