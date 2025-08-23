@@ -972,6 +972,15 @@ def start_product_comparison():
     
     if get_product_comparison_coordinator is None:
         print(f"[DEBUG] ❌ Product comparison coordinator is None - returning 500")
+        # Try to import again and show the error
+        print(f"[DEBUG] 🔄 Attempting emergency import test...")
+        try:
+            from product_comparison import get_product_comparison_coordinator as test_coordinator
+            print(f"[DEBUG] 🎯 Emergency import succeeded: {test_coordinator}")
+        except Exception as e:
+            print(f"[DEBUG] ❌ Emergency import failed: {e}")
+            import traceback
+            traceback.print_exc()
         return jsonify({"error": "Product comparison module not available"}), 500
     
     try:
