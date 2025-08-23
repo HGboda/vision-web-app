@@ -1063,40 +1063,6 @@ def stream_product_comparison(session_id):
             'Content-Type': 'text/event-stream',
         }
     )
-            except Exception as e:
-                print(f"Error processing object: {e}")
-                continue
-        
-        # 객체가 없는 경우
-        if not object_ids:
-            return jsonify({"error": "No valid objects to add"})
-        
-        # 디버깅: 메타데이터 출력
-        print(f"[DEBUG] Adding {len(object_ids)} objects to vector DB")
-        print(f"[DEBUG] First metadata sample: {object_metadatas[0] if object_metadatas else 'None'}")
-        
-        try:
-            # 객체들을 DB에 추가
-            object_collection.add(
-                ids=object_ids,
-                embeddings=object_embeddings,
-                metadatas=object_metadatas
-            )
-            print("[DEBUG] Successfully added objects to vector DB")
-        except Exception as e:
-            print(f"[DEBUG] Error adding to vector DB: {e}")
-            raise e
-        
-        return jsonify({
-            "success": True,
-            "image_id": image_id,
-            "object_count": len(object_ids),
-            "object_ids": object_ids
-        })
-    
-    except Exception as e:
-        print(f"Error in add-detected-objects API: {e}")
-        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/search-similar-objects', methods=['POST'])
 @login_required
