@@ -981,23 +981,35 @@ class ProductComparisonCoordinator:
                 
             # Step 2: Extract features with Feature Extraction Agent
             session_manager.add_message(session_id, "Step 2: Extracting product specifications...")
-            feature_results = await self.feature_extractor.process(session_id, image_results)
+            try:
+                feature_results = await self.feature_extractor.process(session_id, image_results)
+            except Exception as e:
+                session_manager.add_message(session_id, f"Warning: Feature extraction failed: {str(e)}")
+                feature_results = {"specifications": {"error": f"Feature extraction failed: {str(e)}"}}
             
             # Step 3: Compare products with Comparison Agent if we have multiple products
             comparison_results = {}
             if len(product_info) >= 2:
                 session_manager.add_message(session_id, "Step 3: Comparing products...")
-                comparison_results = await self.comparison_agent.process(
-                    session_id, 
-                    {**feature_results, "specifications": feature_results.get("specifications", {})}
-                )
+                try:
+                    comparison_results = await self.comparison_agent.process(
+                        session_id, 
+                        {**feature_results, "specifications": feature_results.get("specifications", {})}
+                    )
+                except Exception as e:
+                    session_manager.add_message(session_id, f"Warning: Comparison failed: {str(e)}")
+                    comparison_results = {"comparison": {"error": f"Comparison failed: {str(e)}"}}
                 
                 # Step 4: Generate recommendation with Recommendation Agent
                 session_manager.add_message(session_id, "Step 4: Generating purchase recommendation...")
-                recommendation_results = await self.recommendation_agent.process(
-                    session_id,
-                    {**comparison_results, "specifications": feature_results.get("specifications", {})}
-                )
+                try:
+                    recommendation_results = await self.recommendation_agent.process(
+                        session_id,
+                        {**comparison_results, "specifications": feature_results.get("specifications", {})}
+                    )
+                except Exception as e:
+                    session_manager.add_message(session_id, f"Warning: Recommendation failed: {str(e)}")
+                    recommendation_results = {"recommendation": {"error": f"Recommendation failed: {str(e)}"}}
             else:
                 session_manager.add_message(session_id, "Skipping comparison: Only one product detected")
                 comparison_results = {"comparison": {"error": "Need at least two products to compare"}}
