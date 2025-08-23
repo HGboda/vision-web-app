@@ -225,16 +225,24 @@ const ProductComparison = () => {
     eventSource.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
+        console.log('React SSE received:', data);
+        
         if (data.message) {
           addLog(data.message, data.agent || 'info');
-        }
-        // 최종 결과가 오면 분석 결과 업데이트
-        if (data.final_result) {
+        } else if (data.status) {
+          addLog(`Status: ${data.status}`, 'system');
+        } else if (data.final_result) {
+          console.log('Final result received:', data.final_result);
           setAnalysisResults(data.final_result);
+          setIsProcessing(false);
+          eventSource.close();
+        } else if (data.error) {
+          addLog(`Error: ${data.error}`, 'error');
           setIsProcessing(false);
           eventSource.close();
         }
       } catch (err) {
+        console.error('SSE parsing error:', err);
         addLog(`Event processing error: ${err.message}`, 'error');
       }
     };
