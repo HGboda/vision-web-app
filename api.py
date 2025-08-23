@@ -933,63 +933,91 @@ def add_detected_objects():
 @login_required
 def start_product_comparison():
     """Start a new product comparison session"""
+    print(f"[DEBUG] 🚀 start_product_comparison endpoint called")
+    print(f"[DEBUG] 🔍 get_product_comparison_coordinator: {get_product_comparison_coordinator}")
+    
     if get_product_comparison_coordinator is None:
+        print(f"[DEBUG] ❌ Product comparison coordinator is None - returning 500")
         return jsonify({"error": "Product comparison module not available"}), 500
     
     try:
+        print(f"[DEBUG] 📝 Processing request data...")
         # Generate session ID if provided in form or query params, otherwise create new one
         session_id = request.form.get('session_id') or request.args.get('session_id') or str(uuid.uuid4())
+        print(f"[DEBUG] 🆔 Session ID: {session_id}")
         
         # Get analysis type if provided (info, compare, value, recommend)
         analysis_type = request.form.get('analysisType') or request.args.get('analysisType', 'info')
+        print(f"[DEBUG] 📊 Analysis type: {analysis_type}")
         
         # Process images from FormData or JSON
         images = []
+        print(f"[DEBUG] 🖼️ Processing images...")
+        print(f"[DEBUG] 📋 Request files: {list(request.files.keys())}")
+        print(f"[DEBUG] 📋 Request form: {dict(request.form)}")
         
         # Check if request is multipart form data
         if request.files:
+            print(f"[DEBUG] 📁 Processing multipart form data...")
             # Handle FormData with file uploads (from frontend)
             if 'image1' in request.files and request.files['image1']:
                 img1 = request.files['image1']
+                print(f"[DEBUG] 🖼️ Processing image1: {img1.filename}")
                 try:
                     images.append(Image.open(img1.stream))
+                    print(f"[DEBUG] ✅ Image1 processed successfully")
                 except Exception as e:
-                    print(f"Error processing image1: {e}")
+                    print(f"[DEBUG] ❌ Error processing image1: {e}")
                     
             if 'image2' in request.files and request.files['image2']:
                 img2 = request.files['image2']
+                print(f"[DEBUG] 🖼️ Processing image2: {img2.filename}")
                 try:
                     images.append(Image.open(img2.stream))
+                    print(f"[DEBUG] ✅ Image2 processed successfully")
                 except Exception as e:
-                    print(f"Error processing image2: {e}")
+                    print(f"[DEBUG] ❌ Error processing image2: {e}")
                     
         # Fallback to JSON with base64 images (for API testing)
         elif request.json and 'images' in request.json:
+            print(f"[DEBUG] 📋 Processing JSON with base64 images...")
             image_data_list = request.json.get('images', [])
-            for image_data in image_data_list:
+            for i, image_data in enumerate(image_data_list):
+                print(f"[DEBUG] 🖼️ Processing base64 image {i+1}")
                 img = decode_base64_image(image_data)
                 if img is not None:
                     images.append(img)
+                    print(f"[DEBUG] ✅ Base64 image {i+1} processed successfully")
+                else:
+                    print(f"[DEBUG] ❌ Failed to decode base64 image {i+1}")
                     
+        print(f"[DEBUG] 📊 Total images processed: {len(images)}")
         if not images:
+            print(f"[DEBUG] ❌ No valid images provided - returning 400")
             return jsonify({"error": "No valid images provided"}), 400
         
         # Get coordinator instance
+        print(f"[DEBUG] 🎯 Getting coordinator instance...")
         coordinator = get_product_comparison_coordinator()
+        print(f"[DEBUG] ✅ Coordinator obtained: {type(coordinator).__name__}")
         
         # Pass the analysis type and session metadata to the coordinator
         session_metadata = {
             'analysis_type': analysis_type,
             'timestamp': time.strftime('%Y-%m-%d %H:%M:%S')
         }
+        print(f"[DEBUG] 📋 Session metadata: {session_metadata}")
         
         # Start processing in a background thread
+        print(f"[DEBUG] 🧵 Starting background processing thread...")
         def run_async_task(loop):
             try:
+                print(f"[DEBUG] 🔄 Setting event loop and starting coordinator.process_images...")
                 asyncio.set_event_loop(loop)
                 loop.run_until_complete(coordinator.process_images(session_id, images, session_metadata))
+                print(f"[DEBUG] ✅ coordinator.process_images completed successfully")
             except Exception as e:
-                print(f"Error in async task: {e}")
+                print(f"[DEBUG] ❌ Error in async task: {e}")
                 import traceback
                 traceback.print_exc()
         
@@ -997,17 +1025,22 @@ def start_product_comparison():
         thread = Thread(target=run_async_task, args=(loop,))
         thread.daemon = True
         thread.start()
+        print(f"[DEBUG] 🚀 Background thread started")
         
         # Return session ID for client to use with streaming endpoint
-        return jsonify({
+        response_data = {
             "session_id": session_id,
             "message": "Product comparison started",
             "status": "processing"
-        })
+        }
+        print(f"[DEBUG] ✅ Returning success response: {response_data}")
+        return jsonify(response_data)
         
     except Exception as e:
-        print(f"Error starting product comparison: {e}")
+        print(f"[DEBUG] ❌ Exception in start_product_comparison: {e}")
+        print(f"[DEBUG] ❌ Exception type: {type(e).__name__}")
         import traceback
+        print(f"[DEBUG] ❌ Full traceback:")
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
