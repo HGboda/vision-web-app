@@ -1125,6 +1125,7 @@ def stream_product_comparison(session_id):
                 new_messages = messages[last_message_index:]
                 print(f"[DEBUG] 📤 Sending {len(new_messages)} new messages")
                 for msg in new_messages:
+                    print(f"[DEBUG] 📨 Message: {msg}")
                     yield f"data: {json.dumps({'message': msg})}\n\n"
                 last_message_index = len(messages)
             
@@ -1135,6 +1136,7 @@ def stream_product_comparison(session_id):
             if status in ['completed', 'error']:
                 result = coordinator.get_session_result(session_id)
                 print(f"[DEBUG] 🏁 Session {session_id} finished with status: {status}")
+                print(f"[DEBUG] 🎯 Final result: {result}")
                 yield f"data: {json.dumps({'final_result': result})}\n\n"
                 break
             
