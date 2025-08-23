@@ -1,20 +1,32 @@
 # Product Comparison API Testing Instructions
 
-To test the product comparison API, place test images in this directory. The test images can be:
+This directory contains test images for the vision LLM agent.
 
-1. Cars (e.g., car1.jpg, car2.jpg)
-2. Electronics like smartphones or laptops (e.g., phone1.jpg, phone2.jpg)
-3. Any other products you want to compare
+Note: Test images should be added locally for testing purposes.
+The repository does not include binary image files due to Hugging Face Space limitations.
+
+For testing, add your own images:
+- car1.jpg: Test vehicle image 1
+- car2.jpg: Test vehicle image 2
+
+These images can be used to test:
+1. Object detection and classification
+2. Image analysis and description
+3. Product comparison features
+4. Multi-image processing capabilities
+
+Images should be in JPEG format and optimized for web usage while maintaining sufficient quality for computer vision tasks.
 
 ## Testing Steps
 
-1. Start the Flask app: `python app.py`
-2. In a separate terminal, run the test script:
-   `python test_product_comparison_api.py --images test_images/image1.jpg test_images/image2.jpg`
+1. Add test images to this directory locally
+2. Start the Flask app: `python api.py`
+3. Access the web interface at http://localhost:7860
+4. Use the Product Comparison tab to upload and compare images
 
 ## Expected Results
 
-The test script will:
+The application will provide detailed analysis and comparison of uploaded images.
 - Send images to the API endpoint
 - Connect to the SSE stream to receive real-time updates
 - Display the final analysis results
