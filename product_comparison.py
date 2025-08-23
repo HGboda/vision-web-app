@@ -164,7 +164,7 @@ class BaseAgent:
                     api_key = os.environ.get('OPENAI_API_KEY')
                     if api_key:
                         self.llm = ChatOpenAI(
-                            model="gpt-4",
+                            model="gpt-5-mini",
                             temperature=0.7,
                             api_key=api_key
                         )
