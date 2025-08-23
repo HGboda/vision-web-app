@@ -26,3 +26,6 @@ dist/
 # Env files
 .env
 .env.*
+
+# Ignore static backups
+/static_bak_*/
